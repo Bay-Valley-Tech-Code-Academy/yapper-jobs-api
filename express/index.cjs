@@ -7,9 +7,8 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 require('dotenv').config();
 
-// const uts = Date.now()
-const time = new Date(Date.now());
-const writer = fs.createWriteStream('express/ape.log', {flags: 'a'});
+const time = new Date(Date.now());// used to log server start
+const writer = fs.createWriteStream('express/ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
 const port = process.env.PORT; // default port
@@ -23,6 +22,7 @@ const pool = mysql.createPool({
 
 app.use(bodyParser.json());
 
+// Setup connection to MySQL server
 app.use(async (req, res, next) => {
   try {
     req.db = await pool.getConnection();
@@ -40,8 +40,8 @@ app.use(async (req, res, next) => {
 
 // Register endpoint for job seeker
 app.post('/register/seeker', async (req, res) => {
-  console.log('Registration attempt: seeker');
-  const newTime = new Date(Date.now());
+  console.log('registration attempt: seeker');
+  const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | Registration attempt: seeker\n`);
   const {
     username,
@@ -49,41 +49,53 @@ app.post('/register/seeker', async (req, res) => {
     email
   } = req.body;
   try {
-    let check;
+    // check if input exists and is safe
     if(username == null || pass == null || email == null) {
-      throw({errStatus: 400, errObj: {error: 'failed seeker add', reason: 'missing field'}});
-    } 
+      throw({status: 400, error: 'failed seeker add', reason: 'missing field'});
+    }
+    if(!validSAN(username) || !validSAN(pass) || !validSAN(email)) {
+      throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
+    }
+    // check if user or email already exists
+    let check;
     try {
-      check = await checkUser(req, username, `Seeker`);
+      check = await checkUser(req, username, email, `Seeker`);
     } catch (err) {
-      throw({errStatus:500, errObj: {error: err, reason: 'check failed'}});
+      throw({status:500, error: err, reason: 'check failed'});
     }
-    if(check != false) {
-      throw({errStatus: 400, errObj: {error: 'failed seeker add', reason: check.reason}});
+    if(check.exists != false) {
+      throw({status: 400, error: 'failed seeker add', reason: check.reason});
     }
-    // console.log("shouldn't see this");
+    // encrypt password, add user to database, respond to caller, and log successful registration
     await bcrypt.hash(pass, 10)
     .then(async hash => {
       try {
         const [user] = await req.db.query(`
           INSERT INTO Seeker (seeker_id, user_name, user_pass, email)
-          VALUES (uuid_to_bin(uuid()), :username, :pass, :email)
+          VALUES (uuid_to_bin(uuid()), :username, :pass, :email);
         `, {
           username: username,
           pass: hash,
           email: email
         });
-        res.status(201);
-        res.json({success: true});
+        res.status(201).json({success: true});
         console.log('USER', user);
+        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/seeker | success: job seeker ${username} added | ${username}@${req.socket.remoteAddress}\n`);
       } catch (err) {
-        console.log('error', err);
+        res.status(500).json({success: false, error: 'server failure'})
+        console.warn(err);
+        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker bcrypt\.then | error: ${err} | attempt: ${username}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
-    res.status(err.errStatus != null ? err.errStatus : 500);
-    res.json({success: false, error: err.errObj.reason})
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | error: ${err.errObj.error} | reason: ${err.errObj.reason} | @${req.socket.remoteAddress}\n`);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker | error: ${err} | @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/seeker | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
+    }
   }
 });
 
@@ -91,7 +103,7 @@ app.post('/register/seeker', async (req, res) => {
 app.post('/register/employer', async (req, res) => {
   console.log('Registration attempt: employer');
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | Registration attempt: employer\n`);
+  writer.write(`${setTimestamp(newTime)} | registration attempt: employer\n`);
   const {
     username,
     pass,
@@ -112,17 +124,26 @@ app.post('/register/employer', async (req, res) => {
       website == null ||
       industry == null
     ) {
-      // res.status(400);
-      // res.json({Error: 'missing field'});
-      throw({errStatus: 400, errObj: {error: 'failed employer add', reason: 'missing field'}});
-    } 
+      throw({status: 400, error: 'failed employer add', reason: 'missing field'});
+    }
+    if(
+      !validSAN(username) ||
+      !validSAN(pass) ||
+      !validSAN(email) ||
+      !validSAN(mobile) ||
+      !validSAN(company) ||
+      !validSAN(website) ||
+      !validSAN(industry)
+    ) {
+      throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
+    }
     try {
       check = await checkUser(req, username, email, `Employer`, company);
     } catch (err) {
-      throw({errStatus:500, errObj: {error: err, reason: 'check failed'}});
+      throw({status:500, error: err, reason: 'check failed'});
     }
     if(check.exists != false) {
-      throw({errStatus: 400, errObj: {error: 'failed employer add', reason: check.reason}});
+      throw({status: 400, error: 'failed employer add', reason: check.reason});
     }
     // console.log("shouldn't see this");
     await bcrypt.hash(pass, 10)
@@ -130,7 +151,7 @@ app.post('/register/employer', async (req, res) => {
       try {
         const [user] = await req.db.query(`
           INSERT INTO Employer (employer_id, user_name, user_pass, email, mobile, company, website, industry)
-          VALUES (uuid_to_bin(uuid()), :username, :pass, :email, :mobile, :company, :website, industry)
+          VALUES (uuid_to_bin(uuid()), :username, :pass, :email, :mobile, :company, :website, industry);
         `, {
           username: username,
           pass: hash,
@@ -140,25 +161,174 @@ app.post('/register/employer', async (req, res) => {
           website: website,
           industry: industry
         });
-        res.status(201);
-        res.json({success: true});
+        res.status(201).json({success: true, user: user});
         console.log('USER', user);
+        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${username} @ ${company} added | @${req.socket.remoteAddress}\n`);
       } catch (err) {
-        res.status(500);
-        res.json({success: false, error: 'server failure'})
+        res.status(500).json({success: false, error: 'server failure'})
         console.warn(err);
-        writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer bcrypt\.then | error: ${err} | attempt: ${username}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
-    res.status(err.errStatus != null ? err.errStatus : 500);
-    res.json({success: false, error: err.errObj.reason != null ? err.errObj.reason : 'server failure'})
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | error: ${err.errObj.error} | reason: ${err.errObj.reason} | @${req.socket.remoteAddress}\n`);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err} | attempt: ${username}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${username}@${req.socket.remoteAddress}\n\n`);
+    }
+  }
+});
+
+app.post('/login/seeker', async (req, res) => {
+  console.log('login attempt: seeker');
+  const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());
+  writer.write(`${setTimestamp(newTime)} | login attempt: seeker\n`);
+  const {cred, pass} = req.body;
+  try {
+    let check;
+    if(cred == null || pass == null) {
+      throw({status: 400, error: 'failed seeker login', reason: 'missing field'});
+    }
+    if(
+      !validSAN(cred) ||
+      !validSAN(pass)
+    ) {
+      throw({status: 400, error: 'failed seeker login', reason: 'invalid input'});
+    }
+    check = await checkUser(req, cred, cred, `Seeker`);
+    if(check.exists == false) {
+      throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
+    }
+    let response;
+    if(!cred.includes('@')) {
+      response = await req.db.query(`SELECT user_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
+        WHERE (user_name = :cred AND delete_flag = 0);`,
+        {cred: cred}
+      );
+    } else {
+      response = await req.db.query(`SELECT user_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
+        WHERE email = :cred AND delete_flag = 0;`,
+        {cred: cred}
+      );
+    }
+    const [[users]] = response;
+    if (!users) {
+      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
+    }
+    const dbPassword = `${users.user_pass}`;
+    const compare = await bcrypt.compare(pass, dbPassword);
+    if(!compare) {
+      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
+    }
+    const payload = {
+      user_id: users.user_id,
+      user_name: users.user_name,
+      email: users.email,
+      exp: timeNow + (60 * 60 * 24 * 7 * 2)
+    }
+    
+    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
+    
+    res.status(200).json({success: true, user_name: users.user_name, email: users.email, jwt: encodedUser});
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | login: seeker ${users.user_name} logged in | @${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/seeker | error: ${err} | attempt: ${username}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/seeker | error: ${err.error} | reason: ${err.reason} | attempt: ${username}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+app.post('/login/employer', async (req, res) => {
+  console.log('login attempt: employer');
+  const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());
+  writer.write(`${setTimestamp(newTime)} | login attempt: employer\n`);
+  const {cred, pass, company} = req.body;
+  try {
+    let check;
+    if(cred == null || pass == null || company == null) {
+      console.log('bib')
+      throw({status: 400, error: 'failed employer login', reason: 'missing field'});
+    }
+    if(
+      !validSAN(cred) ||
+      !validSAN(pass)
+    ) {
+      console.log('bub')
+      throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
+    }
+    check = await checkUser(req, cred, cred, `Employer`, company);
+    if(check.exists == false) {
+      console.log('bob')
+      throw({status: 400, error: 'failed employer login', reason: 'user not found'});
+    }
+    let response;
+    if(!cred.includes('@')) {
+      response = await req.db.query(`SELECT user_name, user_pass, email, hex(employer_id) AS user_id FROM Employer
+        WHERE (user_name = :cred AND delete_flag = 0 AND company = :company);`,
+        {
+          cred: cred,
+          company: company
+        }
+      );
+    } else {
+      response = await req.db.query(`SELECT user_name, user_pass, email, hex(employer_id) AS user_id FROM Employer
+        WHERE (email = :cred AND delete_flag = 0 AND company = :company);`,
+        {
+          cred: cred,
+          company: company
+        }
+      );
+    }
+    const [[users]] = response;
+    if (!users) {
+      console.log('beb')
+      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
+    }
+    const dbPassword = `${users.user_pass}`;
+    const compare = await bcrypt.compare(pass, dbPassword);
+    if(!compare) {
+      console.log('bab')
+      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
+    }
+    const payload = {
+      user_id: users.user_id,
+      user_name: users.user_name,
+      email: users.email,
+      company: company,
+      exp: timeNow + (60 * 60 * 24 * 7 * 2)
+    }
+    
+    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
+    
+    res.status(200).json({success: true, user_name: users.user_name, email: users.email, company: company, jwt: encodedUser});
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.user_name} @ ${company} logged in | @${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err} | attempt: ${username}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${username}@${req.socket.remoteAddress}\n`);
+    }
   }
 });
 
 // Check if user already exists for that type of user
 async function checkUser(req, user, email, table, company) {
+  const newTime = new Date(Date.now());
   try {
     let sql;
     if(table == 'Seeker'){
@@ -172,7 +342,7 @@ async function checkUser(req, user, email, table, company) {
         user +
         '" AND delete_flag = 0) WHEN EXISTS(SELECT 1 FROM ' +
         table +
-        ' WHERE email "' +
+        ' WHERE email = "' +
         email +
         '") THEN 1 ELSE null END AS checked FROM ' +
         table +
@@ -190,7 +360,7 @@ async function checkUser(req, user, email, table, company) {
         user +
         '" AND delete_flag = 0) WHEN EXISTS(SELECT 1 FROM ' +
         table +
-        ' WHERE email "' +
+        ' WHERE email = "' +
         email +
         '" AND company = "' +
         company +
@@ -200,9 +370,8 @@ async function checkUser(req, user, email, table, company) {
     } else {
       throw('Not a valid check');
     }
-    const check = await req.db.query(sql);
-    console.log(check)
-    switch (check[0][0].checked) {// query return logic
+    const [[check]] = await req.db.query(sql);
+    switch (check.checked) {// query return logic
       case 0:
         return {exists: true, reason: 'username taken'};
       case 1:
@@ -219,11 +388,15 @@ async function checkUser(req, user, email, table, company) {
   }
 }
 
-/* OR (email = "' +
-        email +
-        '" AND company = "' +
-        company + */
+function logger(writeOut, newTime, address, source, user) {
+  writer.write(`${setTimestamp(newTime)} | status: ${writeOut.status != null ? writeOut.status : 500} | source: ${source} | error: ${writeOut.error} | reason: ${writeOut.reason} | user: ${user}@${address}\n`);
+}
 
+function errLogger(errOut, newTime, address, source, user) {
+  writer.write(`${setTimestamp(newTime)} | status: ${errOut.status != null ? errOut.status : 500} | source: ${source} | error: ${errOut.error} | reason: ${errOut.reason} | user: ${user}@${address}\n`);
+}
+
+// Human readable timestamp for log
 function setTimestamp(timeUpdate) {
   console.log(timeUpdate)
   console.log(time)
@@ -232,7 +405,7 @@ function setTimestamp(timeUpdate) {
   const hours = (timeUpdate.getHours() < 10) ? '0' + timeUpdate.getHours() : timeUpdate.getHours();
   const minutes = (timeUpdate.getMinutes() < 10) ? '0' + timeUpdate.getMinutes() : timeUpdate.getMinutes();
   const seconds = (timeUpdate.getSeconds() < 10) ? '0' + timeUpdate.getSeconds() : timeUpdate.getSeconds();
-  const formatted = timeUpdate.getFullYear() + ' ' + months + ' ' + days + ' ' + hours + ':' + minutes + ':' + seconds;
+  const formatted = timeUpdate.getFullYear() + '-' + months + '-' + days + ' ' + hours + ':' + minutes + ':' + seconds;
   return formatted;
 }
 
@@ -252,5 +425,5 @@ function validSAN(check) {
 
 app.listen(port, () => {
   console.log(`server started on http://localhost:${port} @ ${time}`);
-  writer.write(`${setTimestamp(time)} | status: server started\n`)
+  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });
