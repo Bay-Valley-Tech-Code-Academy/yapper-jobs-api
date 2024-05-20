@@ -390,7 +390,6 @@ async function login(req, email, pass, table) {
     const dbPassword = `${users.user_pass}`;
     const compare = await bcrypt.compare(pass, dbPassword);
     if(!compare) {
-      console.log('bab')
       throw({status: 400, error: 'failed login',reason: 'incorrect password'});
     }
     const payload = {
@@ -431,8 +430,6 @@ function errLogger(errOut, newTime, address, source, user) {
 
 // Human readable timestamp for log
 function setTimestamp(timeUpdate) {
-  console.log(timeUpdate)
-  console.log(time)
   const months = (timeUpdate.getMonth() < 10) ? '0' + timeUpdate.getMonth() : timeUpdate.getMonth();
   const days = (timeUpdate.getDate() < 10) ? '0' + timeUpdate.getDate() : timeUpdate.getDate();
   const hours = (timeUpdate.getHours() < 10) ? '0' + timeUpdate.getHours() : timeUpdate.getHours();
