@@ -180,7 +180,7 @@ app.post('/register/employer', async (req, res) => {
         
         res.status(200)
         .json({
-          success: true, 
+          success: true,
           firstName: users.firstName,
           lastName: users.lastName,
           email: users.email,
@@ -294,7 +294,13 @@ app.post('/login/employer', async (req, res) => {
     }
     const users = await login(req, email, pass, 'employer');
     
-    res.status(200).json({success: true, user_name: users.user_name, email: users.email, company: users.company, jwt: users.jwt});
+    res.status(200).json({
+      success: true,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      company: users.company,
+      jwt: users.jwt});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.warn(err);
