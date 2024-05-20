@@ -4,7 +4,8 @@ USE Yapper_Jobs;
 
 CREATE TABLE Employer (
 	employer_id BINARY(16) PRIMARY KEY,
-    user_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
     user_pass VARCHAR(255) NOT NULL,
 	email VARCHAR(255) NOT NULL,
 	mobile VARCHAR(18) NOT NULL,
@@ -38,7 +39,8 @@ CREATE TABLE Job (
 
 CREATE TABLE Seeker (
 	seeker_id BINARY(16) PRIMARY KEY,
-    user_name VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255) NOT NULL,
+    last_name VARCHAR(255) NOT NULL,
     user_pass VARCHAR(255) NOT NULL,
     email VARCHAR(255) NOT NULL,
 	education_entries TINYINT NOT NULL DEFAULT 0,
@@ -107,12 +109,19 @@ CREATE TABLE Application (
 	FOREIGN KEY (job_id) REFERENCES Job(job_id)
 );
 
-# initial users needed for proper function
-insert into Seeker(seeker_id, user_name, user_pass, email)
-value(uuid_to_bin(uuid()), "example", "example", "example@example.com");
+CREATE TABLE Saved_Job (
+	seeker_id BINARY(16) NOT NULL,
+	job_id INT UNSIGNED NOT NULL,
+	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id),
+	FOREIGN KEY (job_id) REFERENCES Job(job_id)
+);
 
-insert into Employer(employer_id, user_name, user_pass, email, mobile, company, website, industry)
-value(uuid_to_bin(uuid()), "example", "example", "example@example.com", "12095550123", "example", "example.com", "example");
+# initial users needed for proper function
+insert into Seeker(seeker_id, first_name, last_name, user_pass, email)
+value(uuid_to_bin(uuid()), "example", "example", "elpmaxe", "example@example.com");
+
+insert into Employer(employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
+value(uuid_to_bin(uuid()), "example", "example", "elpmaxe", "example@example.com", "12095550123", "example", "example.com", "example");
 
 
 # how to read plaintext uuid:
