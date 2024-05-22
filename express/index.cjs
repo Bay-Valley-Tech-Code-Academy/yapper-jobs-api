@@ -5,10 +5,14 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
+const { rateLimit } = require('express-rate-limit')
+const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
 require('dotenv').config();
 
+
+
 const time = new Date(Date.now());// used to log server start
-const writer = fs.createWriteStream('express/ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
+const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
 const port = process.env.PORT; // default port
@@ -18,6 +22,30 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res, next) => {
+    const newTime = new Date(Date.now());// for logging
+    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /login | error: Too Many Requests | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    res.status(429).json({success: false, error: 'Too Many Requests'});
+  }
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res, next) => {
+    const newTime = new Date(Date.now());// for logging
+    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /register | error: Too Many Requests | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    res.status(429).json({success: false, error: 'Too Many Requests'});
+  }
 });
 
 app.use(bodyParser.json());
@@ -37,6 +65,9 @@ app.use(async (req, res, next) => {
     throw err;
   }
 });
+
+app.use('/login', loginLimiter);
+app.use('/register', registerLimiter);
 
 // Register endpoint for job seeker
 app.post('/register/seeker', async (req, res) => {
@@ -61,7 +92,7 @@ app.post('/register/seeker', async (req, res) => {
     // check if user or email already exists
     let check;
     try {
-      check = await checkUser(req, email, `seeker`);
+      check = await checkUser(req, email);
     } catch (err) {
       throw({status:500, error: err, reason: 'check failed'});
     }
@@ -153,7 +184,7 @@ app.post('/register/employer', async (req, res) => {
       throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
     }
     try {
-      check = await checkUser(req, email, `employer`, company);
+      check = await checkUser(req, email);
     } catch (err) {
       throw({status:500, error: err, reason: 'check failed'});
     }
@@ -222,7 +253,7 @@ app.post('/login/seeker', async (req, res) => {
     if(!validSAN(email) || !validSAN(pass)) {
       throw({status: 400, error: 'failed seeker login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email, `seeker`);
+    check = await checkUser(req, email);
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
@@ -292,7 +323,7 @@ app.post('/login/employer', async (req, res) => {
     if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass, 'employer');
+    const users = await login(req, email, pass);
     
     res.status(200).json({
       success: true,
@@ -315,143 +346,7 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
-// Check if user already exists for that type of user
-async function checkUser(req, email, table) {
-  const newTime = new Date(Date.now());
-  try {
-    let check;
-    if(table == 'seeker'){
-      const [[sql]] = await req.db.query(`
-        SELECT CASE 
-          WHEN EXISTS(SELECT 1 FROM Seeker WHERE email = :email)
-            THEN (SELECT delete_flag FROM Seeker WHERE email = :email AND delete_flag = 0)
-          ELSE null
-          END AS checked
-        FROM Seeker LIMIT 1;`,
-        {email: email}
-      );
-      check = sql;
-    } else if (table == 'employer'){
-      const [[sql]] = await req.db.query(`
-        SELECT CASE 
-          WHEN EXISTS(SELECT 1 FROM Employer WHERE email = :email)
-            THEN (SELECT delete_flag FROM Employer WHERE email = :email AND delete_flag = 0)
-          ELSE null
-          END AS checked
-        FROM Seeker LIMIT 1;`,
-        {email: email}
-      );
-      check = sql;
-    } else {
-      throw('Not a valid check');
-    }
-    switch (check.checked) {// query return logic
-      case 0:
-        return {exists: true, reason: 'email already registered'};
-      case 1:
-        return {exists: false, reason: null};
-      case null:
-        return {exists: false, reason: null};
-      default:
-        throw('unexpected value returned while searching');
-    }
-  } catch(err) {
-      console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
-      return err;
-  }
-}
-
-async function login(req, email, pass, table) {
-  const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());
-  try {
-    let users;
-    if(table == 'seeker'){
-      const [[response]] = await req.db.query(`
-        SELECT first_name, last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
-          WHERE (email = :email AND delete_flag = 0);`,
-        {email: email}
-      );
-      users = response;
-    } else if (table == 'employer'){
-      const [[response]] = await req.db.query(`
-        SELECT first_name, last_name, user_pass, email, company, hex(employer_id) AS user_id FROM Employer
-          WHERE (email = :email AND delete_flag = 0);`,
-        {email: email}
-      );
-      users = response;
-    } else {
-      throw({status: 500, error: 'failed login', reason: 'user logging in'});
-    }
-    if (!users) {
-      throw({status: 500, error: 'failed login', reason: 'user not found'});
-    }
-    const dbPassword = `${users.user_pass}`;
-    const compare = await bcrypt.compare(pass, dbPassword);
-    if(!compare) {
-      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
-    }
-    const payload = {
-      user_id: users.user_id,
-      // firstName: users.first_name,
-      // lastName: users.last_name,
-      email: users.email,
-      // company: !company ? null : company,
-      type: table,
-      exp: timeNow + (60 * 60 * 24 * 7 * 2)
-    }
-    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
-    return {
-      firstName: users.first_name,
-      lastName: users.last_name,
-      email: users.email,
-      company: !users.company ? null : users.company,
-      jwt: encodedUser
-    }
-  } catch(err) {
-      console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
-      return err;
-  }
-  /* const [[users]] = await req.db.query(`SELECT  :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
-    WHERE (email = :email AND delete_flag = 0);`,
-    {email: email}
-  ); */
-}
-
-function logger(writeOut, newTime, address, source, user) {
-  writer.write(`${setTimestamp(newTime)} | status: ${writeOut.status != null ? writeOut.status : 500} | source: ${source} | error: ${writeOut.error} | reason: ${writeOut.reason} | user: ${user}@${address}\n`);
-}
-
-function errLogger(errOut, newTime, address, source, user) {
-  writer.write(`${setTimestamp(newTime)} | status: ${errOut.status != null ? errOut.status : 500} | source: ${source} | error: ${errOut.error} | reason: ${errOut.reason} | user: ${user}@${address}\n`);
-}
-
-// Human readable timestamp for log
-function setTimestamp(timeUpdate) {
-  const months = (timeUpdate.getMonth() < 10) ? '0' + timeUpdate.getMonth() : timeUpdate.getMonth();
-  const days = (timeUpdate.getDate() < 10) ? '0' + timeUpdate.getDate() : timeUpdate.getDate();
-  const hours = (timeUpdate.getHours() < 10) ? '0' + timeUpdate.getHours() : timeUpdate.getHours();
-  const minutes = (timeUpdate.getMinutes() < 10) ? '0' + timeUpdate.getMinutes() : timeUpdate.getMinutes();
-  const seconds = (timeUpdate.getSeconds() < 10) ? '0' + timeUpdate.getSeconds() : timeUpdate.getSeconds();
-  const formatted = timeUpdate.getFullYear() + '-' + months + '-' + days + ' ' + hours + ':' + minutes + ':' + seconds;
-  return formatted;
-}
-
-// validate input
-// alphanumeric
-function validAN(check) {
-  const pattern = /^[A-Za-z0-9]+$/g;
-  const checked = pattern.test(check);
-  return checked;
-}
-// special characters + alphanumeric
-function validSAN(check) {
-  const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
-  const checked = pattern.test(check);
-  return checked;
-}
+// from here
 
 app.listen(port, () => {
   console.log(`server started on http://localhost:${port} @ ${time}`);
