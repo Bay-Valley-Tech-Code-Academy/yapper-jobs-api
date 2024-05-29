@@ -21,3 +21,9 @@
   - Responses:
     - `{success: true, firstName: <String>, lastName: <String>, email: <String>, company: <String>, jwt: <String>}`
     - `{success: false, error: <String>}`
+
++ Endpoint: /add-job
+  - Expects: `{title: <String>, city: <String>, state: <String>, zip: <number>, experienceLevel: <String || null>, employmentType: <String>, companySize: <number || null>, salaryLow: <number || null>, salaryHigh: <number || null>, benefits: <JSON || null>, certifications: <JSON || null>, jobDescription: <String>, questions: <JSON || null>}`
+  - Responses:
+    - `{success: true, jobId: <number>}`
+    - `{success: false, error: <String>}`
