@@ -7,9 +7,12 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
 const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
+const { fetchAndSaveJobs } = require('./jobDataHandler');
 require('dotenv').config();
+// require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-
+// Call fetchAndSaveJobs function to fetch and save job data
+fetchAndSaveJobs();
 
 const time = new Date(Date.now());// used to log server start
 const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
@@ -21,7 +24,7 @@ const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
 });
 
 const loginLimiter = rateLimit({
