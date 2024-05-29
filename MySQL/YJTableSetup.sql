@@ -1,55 +1,60 @@
-CREATE DATABASE Yapper_Jobs;
+#CREATE DATABASE Yapper_Jobs;
 
 USE Yapper_Jobs;
 
 CREATE TABLE Employer (
 	employer_id BINARY(16) PRIMARY KEY,
-    first_name VARCHAR(255) NOT NULL,
-    last_name VARCHAR(255) NOT NULL,
-    user_pass VARCHAR(255) NOT NULL,
+	first_name VARCHAR(255) NOT NULL,
+	last_name VARCHAR(255) NOT NULL,
+	user_pass VARCHAR(255) NOT NULL,
 	email VARCHAR(255) NOT NULL,
 	mobile VARCHAR(18) NOT NULL,
 	company VARCHAR(255) NOT NULL,
 	website VARCHAR(255) NOT NULL,
 	industry VARCHAR(32) NOT NULL,
-    approver BOOLEAN NOT NULL DEFAULT 0,
-    approve_flag BOOLEAN NOT NULL DEFAULT 0,
-    delete_flag BOOLEAN NOT NULL DEFAULT 0
+	approver BOOLEAN NOT NULL DEFAULT 0,
+	approve_flag BOOLEAN NOT NULL DEFAULT 0,
+	delete_flag BOOLEAN NOT NULL DEFAULT 0
 );
 
 CREATE TABLE Job (
+	title VARCHAR(255),
 	job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    location VARCHAR(255) NOT NULL,
-    industry VARCHAR(255) NOT NULL,
-    experience_level VARCHAR(255) NOT NULL,
-    employment_type VARCHAR(255) NOT NULL,
-    company_size VARCHAR(255) NOT NULL,
-    salary_low INT NOT NULL,
-    salary_high INT NOT NULL,
-    benefits INT NOT NULL,
-    certifications INT NOT NULL,
-    job_description TEXT NOT NULL,
-    questions JSON,
-    delete_flag BOOLEAN NOT NULL DEFAULT 0,
-    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    employer_id BINARY(16),
-    PRIMARY KEY (job_id),
-    FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
+	company VARCHAR(255) NOT NULL,
+	city VARCHAR(255) NOT NULL,
+	state VARCHAR(2) NOT NULL,
+	zip int3 NOT NULL,
+	industry VARCHAR(255),
+	website VARCHAR(255),
+	experience_level VARCHAR(255),
+	employment_type VARCHAR(255) NOT NULL,
+	company_size VARCHAR(255),
+	salary_low INT3,
+	salary_high INT3,
+	benefits JSON,
+	certifications JSON,
+	job_description TEXT NOT NULL,
+	questions JSON,
+	delete_flag BOOLEAN NOT NULL DEFAULT 0,
+	created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	employer_id BINARY(16),
+	PRIMARY KEY (job_id),
+	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
 );
 
 CREATE TABLE Seeker (
 	seeker_id BINARY(16) PRIMARY KEY,
-    first_name VARCHAR(255) NOT NULL,
-    last_name VARCHAR(255) NOT NULL,
-    user_pass VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
+	first_name VARCHAR(255) NOT NULL,
+	last_name VARCHAR(255) NOT NULL,
+	user_pass VARCHAR(255) NOT NULL,
+	email VARCHAR(255) NOT NULL,
 	education_entries TINYINT NOT NULL DEFAULT 0,
 	experience_entries TINYINT NOT NULL DEFAULT 0,
 	skill_entries TINYINT NOT NULL DEFAULT 0,
 	link_entries TINYINT NOT NULL DEFAULT 0,
 	publication_entries TINYINT NOT NULL DEFAULT 0,
 	summary TEXT(640),
-    delete_flag BOOLEAN NOT NULL DEFAULT 0
+	delete_flag BOOLEAN NOT NULL DEFAULT 0
 );
 
 CREATE TABLE Education (
@@ -117,16 +122,25 @@ CREATE TABLE Saved_Job (
 );
 
 # initial users needed for proper function
-insert into Seeker(seeker_id, first_name, last_name, user_pass, email)
-value(uuid_to_bin(uuid()), "example", "example", "elpmaxe", "example@example.com");
+INSERT INTO Seeker(seeker_id, first_name, last_name, user_pass, email)
+VALUE(UNHEX('00000000000000000000000000000001'), "example", "example", "elpmaxe", "example@example.com");
 
-insert into Employer(employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
-value(uuid_to_bin(uuid()), "example", "example", "elpmaxe", "example@example.com", "12095550123", "example", "example.com", "example");
+INSERT INTO Employer(employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
+VALUE(UNHEX('00000000000000000000000000000000'), "example", "example", "elpmaxe", "elpmxe@example.com", "12095550123", "example", "example.com", "example");
 
+INSERT INTO Job (title, company, city, state, zip, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, job_id)
+VALUE('example', 'example', 'example', 'EX', 00000, 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'), 12357);
 
 # how to read plaintext uuid:
-# SELECT hex(seeker_id) FROM Seeker;
+# SELECT HEX(<column>) FROM <table>;
+# undo with UNHEX()
 #
 #
+# how to width numbers:
+# SELECT LPAD(<column>, <width>, 0) FROM <table>;
 #
+# For date comparison
+# SELECT EXTRACT(year_month  FROM '2019-07-02 01:02:03');
 #
+# For date display
+# SELECT DATE_FORMAT('2009-10-04 22:23:00', '%Y-%m');

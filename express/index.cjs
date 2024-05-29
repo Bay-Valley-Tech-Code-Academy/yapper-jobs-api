@@ -6,13 +6,14 @@ const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
-const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
+const { title } = require('process');
 require('dotenv').config();
 
 
 
 const time = new Date(Date.now());// used to log server start
-const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
+const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
 const port = process.env.PORT; // default port
@@ -83,10 +84,10 @@ app.post('/register/seeker', async (req, res) => {
   } = req.body;
   try {
     // check if input exists and is safe
-    if(firstName == null || lastName == null || pass == null || email == null) {
+    if(!firstName || !lastName || !pass || !email) {
       throw({status: 400, error: 'failed seeker add', reason: 'missing field'});
     }
-    if(!validSAN(firstName) || !validSAN(lastName) || !validSAN(pass) || !validSAN(email)) {
+    if(!validA(firstName) || !validA(lastName) || !validSAN(pass) || !validSAN(email)) {
       throw({status: 400, error: 'failed seeker add', reason: 'invalid input'});
     }
     // check if user or email already exists
@@ -172,19 +173,20 @@ app.post('/register/employer', async (req, res) => {
       throw({status: 400, error: 'failed employer add', reason: 'missing field'});
     }
     if(
-      !validSAN(firstName) ||
-      !validSAN(lastName) ||
+      !validA(firstName) ||
+      !validA(lastName) ||
       !validSAN(pass) ||
       !validSAN(email) ||
       !validSAN(mobile) ||
       !validSAN(company) ||
       !validSAN(website) ||
-      !validSAN(industry)
+      !validA(industry)
     ) {
       throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
     }
     try {
       check = await checkUser(req, email);
+
     } catch (err) {
       throw({status:500, error: err, reason: 'check failed'});
     }
@@ -208,7 +210,7 @@ app.post('/register/employer', async (req, res) => {
           industry: industry
         });
         const users = await login(req, email, pass, 'employer');
-        
+        console.log(user)
         res.status(200)
         .json({
           success: true,
@@ -218,7 +220,6 @@ app.post('/register/employer', async (req, res) => {
           company: users.company,
           jwt: users.jwt
         });
-        console.log('USER', user);
         writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
@@ -233,7 +234,7 @@ app.post('/register/employer', async (req, res) => {
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -257,27 +258,7 @@ app.post('/login/seeker', async (req, res) => {
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
-    const [[users]] = await req.db.query(`SELECT :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
-      WHERE (email = :email AND delete_flag = 0);`,
-      {email: email}
-    );
-    if (!users) {
-      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
-    }
-    const dbPassword = `${users.user_pass}`;
-    const compare = await bcrypt.compare(pass, dbPassword);
-    if(!compare) {
-      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
-    }
-    const payload = {
-      user_id: users.user_id,
-      // firstName: users.first_name,
-      // lastName: users.last_name,
-      email: users.email,
-      exp: timeNow + (60 * 60 * 24 * 7 * 2)
-    }
-    
-    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
+    const users = await login(req, email, pass, 'seeker');
     
     res.status(200)
     .json({
@@ -313,17 +294,14 @@ app.post('/login/employer', async (req, res) => {
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
     }
-    if(
-      !validSAN(email) ||
-      !validSAN(pass)
-    ) {
+    if(!validSAN(email) || !validSAN(pass)) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email, `employer`);
+    check = await checkUser(req, email);
     if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass);
+    const users = await login(req, email, pass, 'employer');
     
     res.status(200).json({
       success: true,
@@ -346,9 +324,209 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
+// JWT verification checks to see if there is an authorization header with a valid JWT in it.
+app.use(async function verifyJwt(req, res, next) {
+  console.log('Verify attempt: JWT');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | verify attempt: JWT | attempt: @${req.socket.remoteAddress}\n`);
+  try {
+    if (!req.headers.authorization) {
+      throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, no authorization headers'});
+      // writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT\n`);
+      // res.status(400).json({error: 'Invalid authorization, no authorization headers'});
+    }
+  
+    const [scheme, token] = req.headers.authorization.split(' ');
+  
+    if (scheme !== 'Bearer' || token === null) {
+      throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, invalid authorization scheme'});
+      // res.status(400).json({error: 'Invalid authorization, invalid authorization scheme'});
+    }
+  
+    try {
+      const payload = jwt.verify(token, process.env.JWT_KEY);
+      req.user = payload;
+      writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`)
+    } catch (err) {
+      console.log(err);
+      if (
+        err.message && 
+        (err.message.toUpperCase() === 'INVALID TOKEN' || 
+        err.message.toUpperCase() === 'JWT EXPIRED' ||
+        err.message.toUpperCase() ==='JWT MALFORMED')
+      ) {
+        req.status = err.status || 500;
+        req.body = err.message;
+        req.app.emit('jwt-error', err, req);
+        throw({status: 400, error: 'failed JWT verify', reason: err.message});
+      } else {
+  
+        throw((err.status || 500), err.message);
+      }
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: JWT | error: ${err} | @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
+    }
+    
+  }
+  
+
+  await next();
+});
+
+/*  job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    company VARCHAR(255) NOT NULL,
+    city VARCHAR(255) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    zip int3 NOT NULL,
+    industry VARCHAR(255) NOT NULL,
+    experience_level VARCHAR(255) NOT NULL,
+    employment_type VARCHAR(255) NOT NULL,
+    company_size VARCHAR(255) NOT NULL,
+    salary_low INT NOT NULL,
+    salary_high INT NOT NULL,
+    benefits INT NOT NULL,
+    certifications INT NOT NULL,
+    job_description TEXT NOT NULL,
+    questions JSON,
+    delete_flag BOOLEAN NOT NULL DEFAULT 0,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    employer_id BINARY(16), */
+// Add new job endpoint
+app.post('/add-job', async (req, res) => {
+  console.log('Add attempt: job');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | add attempt: job\n`);
+  // api body MUST send null object for empty json inputs
+  const {
+    title,
+    city,
+    state,
+    zip,
+    experienceLevel,
+    employmentType,
+    companySize,
+    salaryLow,
+    salaryHigh,
+    benefits,
+    certifications,
+    jobDescription,
+    questions
+  } = req.body;
+  try {
+    // check if input exists and is safe
+    if(
+      !title            ||
+      !city             ||
+      !state            ||
+      !zip              ||
+      !experienceLevel  ||
+      !employmentType   ||
+      !companySize      ||
+      !salaryLow        ||
+      !salaryHigh       ||
+      !jobDescription
+    ) {
+      throw({status: 400, error: 'failed job add', reason: 'missing field'});
+    }
+    if(
+      !validSAN(title)          ||
+      !validA(city)             ||
+      !validState(state)        ||
+      !validN(zip)              ||
+      !validA(experienceLevel)  ||
+      !validSAN(employmentType) ||
+      !validN(companySize)      ||
+      !validN(salaryLow)        ||
+      !validN(salaryHigh)       ||
+      !validJSON(benefits)      ||
+      !validJSON(certifications)||
+      !validSAN(jobDescription) ||
+      !validJSON(questions)
+    ) {
+      throw({status: 400, error: 'failed job add', reason: 'invalid input'});
+    }
+    // check if user authorized to post jobs for the company
+    let check;
+    try {
+      check = await checkAuth(req, req.user.user_id, req.user.company);
+    } catch (err) {
+      throw({status:500, error: err, reason: 'authorization failed'});
+    }
+    if(check === false) {
+      throw({status: 500, error: 'failed job add', reason: 'failed approval'});
+    }
+    try {
+      const [[employer]] = await req.db.query(`
+        SELECT industry, website FROM Employer WHERE employer_id = UNHEX(:user_id);
+      `,{
+        user_id: req.user.user_id
+      });
+     const job = await req.db.query(`
+        INSERT INTO Job (title, company, city, state, zip, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id)
+        VALUES (:title, :company, :city, :state, :zip, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id));
+      `, {
+        title: title,
+        company: req.user.company,
+        city: city,
+        state: state,
+        zip: zip,
+        industry: employer.industry,
+        website: employer.website,
+        experience_level: experienceLevel,
+        employment_type: employmentType,
+        company_size: companySize,
+        salary_low: salaryLow,
+        salary_high: salaryHigh,
+        benefits: benefits,
+        certifications: certifications,
+        job_description: jobDescription,
+        questions: questions,
+        employer_id: req.user.user_id
+      });
+      const [[jobId]] = await req.db.query(`
+        SELECT job_id FROM Job 
+        WHERE employer_id = UNHEX(:user_id)
+        ORDER BY created DESC
+        LIMIT 1;
+      `,{
+        user_id: req.user.user_id
+      });
+      res.status(200)
+      .json({
+        success: true,
+        jobId: jobId.job_id
+      });
+      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /add-job | success: ${req.user.email} @ ${req.user.company} added job id: ${jobId.job_id} | @${req.socket.remoteAddress}\n`);
+    } catch (err) {
+      throw({status: 500, error: 'failed job add', reason: err.message})
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err.message} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+})
+
 // from here
 
+const bob = 're';
+
 app.listen(port, () => {
-  console.log(`server started on http://localhost:${port} @ ${time}`);
+  console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
+  console.log('test log')
   writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });
