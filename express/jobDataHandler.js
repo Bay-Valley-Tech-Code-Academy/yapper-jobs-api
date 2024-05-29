@@ -8,7 +8,7 @@ const fetchJSearchAPI = async (position = "Software Developer") => {
     const options = {
       method: "GET",
       headers: {
-        "X-RapidAPI-Key": "3d7ce1d4fbmsh9dca1a5f72dab04p1be7eajsn596878a4599b",
+        "X-RapidAPI-Key": process.env.API_KEY,
         "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
       },
     };

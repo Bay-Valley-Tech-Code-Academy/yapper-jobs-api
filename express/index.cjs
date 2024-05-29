@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
@@ -8,7 +9,6 @@ const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
 const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
 const { fetchAndSaveJobs } = require('./jobDataHandler');
-require('dotenv').config();
 // require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 // Call fetchAndSaveJobs function to fetch and save job data
