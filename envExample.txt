@@ -1,0 +1,9 @@
+DB_HOST     = 'localhost'
+DB_USER     = 'root'
+DB_PASSWORD = 'passwordsarehard'
+DB_NAME     = 'suchdata'
+DB_PORT     = '3306'
+
+JWT_KEY = 'idontknowjustputyourkeyhere'
+
+PORT = 3000
