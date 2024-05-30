@@ -10,7 +10,11 @@ const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, vali
 const { title } = require('process');
 require('dotenv').config();
 
-
+const corsOptions = {
+  origin: 'http://localhost:5173', 
+  credentials: true,
+  optionSuccessStatus: 200,
+}
 
 const time = new Date(Date.now());// used to log server start
 const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
@@ -48,6 +52,8 @@ const registerLimiter = rateLimit({
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
+
+app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
 
