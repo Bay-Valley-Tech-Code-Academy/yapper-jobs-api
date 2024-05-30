@@ -7,9 +7,17 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
 const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
+const { fetchAndSaveJobs } = require('./jobDataHandler');
 require('dotenv').config();
+// require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
-
+// Call fetchAndSaveJobs function to fetch and save job data
+try {
+  fetchAndSaveJobs();
+  console.log("Fetch API Successful")
+} catch (error) {
+  console.error("Error fetching and saving jobs:", error);
+}
 
 const time = new Date(Date.now());// used to log server start
 const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
@@ -21,8 +29,11 @@ const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
 });
+
+//enable cors for all routes
+app.use(cors());
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -346,7 +357,18 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
-// from here
+
+//fetch jobs table from database
+app.get('/api/jobs', async (req, res) => {
+  try {
+    const [jobs] = await req.db.query('SELECT job_id, title, location, employment_type, job_description, company FROM job');
+    res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    console.error('Error fetching jobs:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`server started on http://localhost:${port} @ ${time}`);
