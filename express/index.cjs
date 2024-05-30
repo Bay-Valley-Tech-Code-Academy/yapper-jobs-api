@@ -272,7 +272,7 @@ app.post('/login/seeker', async (req, res) => {
       firstName: users.first_name,
       lastName: users.last_name,
       email: users.email,
-      jwt: encodedUser
+      jwt: users.jwt
     });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
