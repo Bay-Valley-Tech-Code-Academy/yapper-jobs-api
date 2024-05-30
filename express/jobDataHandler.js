@@ -19,7 +19,7 @@ const fetchJSearchAPI = async (position = "Software Developer") => {
       );
     }
     const result = await response.json();
-    return result.data; // Extracting the job data array from the response
+    return result.data; // Extracting the job data key array from the response
   } catch (error) {
     console.error(error);
   }
@@ -44,16 +44,18 @@ const insertJobsIntoDatabase = async (jobData) => {
         experienceLevel = "Experience required";
       }
       await connection.execute(
-        "INSERT INTO job (title, company, employment_type, location, experience_level, job_description) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO job (title, company, city, state, is_remote, employment_type, experience_level, job_description) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-          job.job_title,
-          job.employer_name,
-          job.job_employment_type,
-          job.job_country,
-          experienceLevel,
-        //   job.job_min_salary || "Not specified",
-        //   job.job_max_salary || "Not specified",
-          job.job_description,
+          job.job_title, // title
+          job.employer_name, //company
+          job.job_city, //city
+          job.job_state, //state
+          job.job_is_remote ? 1 : 0, //is_remote
+          job.job_employment_type, //employment_type
+          experienceLevel, //experience_level
+          job.job_description, //job_description
+          //   job.job_min_salary || "Not specified",
+          //   job.job_max_salary || "Not specified",
         ]
       );
     }

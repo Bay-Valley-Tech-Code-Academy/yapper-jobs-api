@@ -1,4 +1,7 @@
-
+const mysql = require('mysql2/promise');
+const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const bcrypt = require('bcrypt');
 
 module.exports = {
 // Check if user already exists for that type of user
