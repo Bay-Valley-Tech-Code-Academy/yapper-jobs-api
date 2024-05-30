@@ -21,9 +21,9 @@ CREATE TABLE Job (
 	title VARCHAR(255),
 	job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
 	company VARCHAR(255) NOT NULL,
-	city VARCHAR(255) NOT NULL,
-	state VARCHAR(2) NOT NULL,
-	zip int3 NOT NULL,
+	city VARCHAR(255),
+	state VARCHAR(2),
+    is_remote BOOLEAN NOT NULL DEFAULT 0,
 	industry VARCHAR(255),
 	website VARCHAR(255),
 	experience_level VARCHAR(255),
@@ -128,8 +128,8 @@ VALUE(UNHEX('00000000000000000000000000000001'), "example", "example", "elpmaxe"
 INSERT INTO Employer(employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
 VALUE(UNHEX('00000000000000000000000000000000'), "example", "example", "elpmaxe", "elpmxe@example.com", "12095550123", "example", "example.com", "example");
 
-INSERT INTO Job (title, company, city, state, zip, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, job_id)
-VALUE('example', 'example', 'example', 'EX', 00000, 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'), 12357);
+INSERT INTO Job (title, company, city, state, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, job_id)
+VALUE('example', 'example', 'example', 'EX', 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'), 12357);
 
 # how to read plaintext uuid:
 # SELECT HEX(<column>) FROM <table>;
