@@ -10,15 +10,15 @@ const { fetchAndSaveJobs } = require('./jobDataHandler');
 const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
 const { title } = require('process');
 require('dotenv').config();
-// require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 // Call fetchAndSaveJobs function to fetch and save job data
-// try {
-//   fetchAndSaveJobs();
-//   console.log("Fetch API Successful")
-// } catch (error) {
-//   console.error("Error fetching and saving jobs:", error);
-// }
+//Comment this code block out to avoid fetching data from the API each time you run server
+try {
+  fetchAndSaveJobs();
+  console.log("Fetch API Successful")
+} catch (error) {
+  console.error("Error fetching and saving jobs:", error);
+}
 
 const corsOptions = {
   origin: 'http://localhost:5173', 
