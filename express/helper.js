@@ -174,7 +174,7 @@ module.exports = {
   // alpha
   validA: function (check) {
     if(typeof(check) === 'string') {
-      const pattern = /^[A-Za-z]+$/g;
+      const pattern = /^[A-Za-z ]+$/g;
       const checked = pattern.test(check);
       return checked;
     }
@@ -219,7 +219,7 @@ module.exports = {
   },
   // json we get should only be strings
   validJSON: function (check) {
-    console.log(check)
+    const newTime = new Date(Date.now());
     if(check === undefined || check === null) return true;
     try{
       const arr = Object.values(check);
@@ -227,6 +227,31 @@ module.exports = {
       return valid;
     } catch (err) {
       console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return false;
+    }
+  },
+  // date
+  validDate: function (check) {
+    const newTime = new Date(Date.now());
+    if(check === null) return {valid: true};
+    try{
+      const arr = check.split('-');
+      const year = Number.parseInt(arr[0], 10);
+      if(year < newTime.getFullYear() || year > 3000) return {valid: false};
+      const expDate = new Date(check);
+      const newExp = (expDate.getTime() / (24 * 60 * 60 * 1000));
+      const expUnix = ((newExp * 24 * 60) + expDate.getTimezoneOffset()) * 60 * 1000;
+      const newMin = Math.floor((newTime.getTime() / (24 * 60 * 60 * 1000)) + 15);
+      const minUnix = ((newMin * 24 * 60) + newTime.getTimezoneOffset()) * 60 * 1000;
+      return {
+        valid: expUnix >= minUnix ? true : false,
+        expDate: new Date(expUnix),
+      }
+    } catch (err) {
+      console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return {valid: false};
     }
   },
 }

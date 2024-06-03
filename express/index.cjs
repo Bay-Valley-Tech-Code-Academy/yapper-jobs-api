@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON, validDate} = require('./helper.js');
 const { title } = require('process');
 require('dotenv').config();
 
@@ -81,13 +81,13 @@ app.post('/register/seeker', async (req, res) => {
   console.log('registration attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);// for jwt expiration
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | Registration attempt: seeker\n`);
   const {
     firstName,
     lastName,
     pass,
     email
   } = req.body;
+  writer.write(`${setTimestamp(newTime)} | Registration attempt: seeker | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     // check if input exists and is safe
     if(!firstName || !lastName || !pass || !email) {
@@ -153,7 +153,6 @@ app.post('/register/employer', async (req, res) => {
   console.log('Registration attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | registration attempt: employer\n`);
   const {
     firstName,
     lastName,
@@ -164,6 +163,7 @@ app.post('/register/employer', async (req, res) => {
     website,
     industry
   } = req.body;
+  writer.write(`${setTimestamp(newTime)} | registration attempt: employer | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     let check;
     if(
@@ -250,8 +250,8 @@ app.post('/login/seeker', async (req, res) => {
   console.log('login attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | login attempt: seeker\n`);
   const {email, pass} = req.body;
+  writer.write(`${setTimestamp(newTime)} | login attempt: seeker | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     let check;
     if(!email || !pass) {
@@ -293,8 +293,8 @@ app.post('/login/employer', async (req, res) => {
   console.log('login attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | login attempt: employer\n`);
   const {email, pass} = req.body;
+  writer.write(`${setTimestamp(newTime)} | login attempt: employer | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     let check;
     if(!email || !pass) {
@@ -408,14 +408,15 @@ app.use(async function verifyJwt(req, res, next) {
 // Add new job endpoint
 app.post('/add-job', async (req, res) => {
   console.log('Add attempt: job');
+  const newTimestamp = Math.floor(Date.now() / 1000);
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | add attempt: job\n`);
+  writer.write(`${setTimestamp(newTime)} | add attempt: job | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   // api body MUST send null object for empty json inputs
   const {
     title,
     city,
     state,
-    zip,
+    isRemote,
     experienceLevel,
     employmentType,
     companySize,
@@ -424,21 +425,23 @@ app.post('/add-job', async (req, res) => {
     benefits,
     certifications,
     jobDescription,
+    expDate,
     questions
   } = req.body;
   try {
     // check if input exists and is safe
     if(
-      !title            ||
-      !city             ||
-      !state            ||
-      !zip              ||
-      !experienceLevel  ||
-      !employmentType   ||
-      !companySize      ||
-      !salaryLow        ||
-      !salaryHigh       ||
-      !jobDescription
+      !title                  ||
+      !city                   ||
+      !state                  ||
+      isRemote === undefined  ||
+      !experienceLevel        ||
+      !employmentType         ||
+      !companySize            ||
+      !salaryLow              ||
+      !salaryHigh             ||
+      !jobDescription         ||
+      expDate === undefined
     ) {
       throw({status: 400, error: 'failed job add', reason: 'missing field'});
     }
@@ -446,7 +449,6 @@ app.post('/add-job', async (req, res) => {
       !validSAN(title)          ||
       !validA(city)             ||
       !validState(state)        ||
-      !validN(zip)              ||
       !validA(experienceLevel)  ||
       !validSAN(employmentType) ||
       !validN(companySize)      ||
@@ -455,7 +457,9 @@ app.post('/add-job', async (req, res) => {
       !validJSON(benefits)      ||
       !validJSON(certifications)||
       !validSAN(jobDescription) ||
-      !validJSON(questions)
+      !validJSON(questions)     ||
+      !validDate(expDate).valid ||
+      typeof(isRemote) !== 'boolean'
     ) {
       throw({status: 400, error: 'failed job add', reason: 'invalid input'});
     }
@@ -469,6 +473,7 @@ app.post('/add-job', async (req, res) => {
     if(check === false) {
       throw({status: 500, error: 'failed job add', reason: 'failed approval'});
     }
+
     try {
       const [[employer]] = await req.db.query(`
         SELECT industry, website FROM Employer WHERE employer_id = UNHEX(:user_id);
@@ -476,14 +481,14 @@ app.post('/add-job', async (req, res) => {
         user_id: req.user.user_id
       });
      const job = await req.db.query(`
-        INSERT INTO Job (title, company, city, state, zip, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id)
-        VALUES (:title, :company, :city, :state, :zip, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id));
+        INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
+        VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
       `, {
         title: title,
         company: req.user.company,
         city: city,
         state: state,
-        zip: zip,
+        is_remote: isRemote,
         industry: employer.industry,
         website: employer.website,
         experience_level: experienceLevel,
@@ -495,12 +500,15 @@ app.post('/add-job', async (req, res) => {
         certifications: certifications,
         job_description: jobDescription,
         questions: questions,
-        employer_id: req.user.user_id
+        employer_id: req.user.user_id,
+        date_created: newTime,
+        expires: !expDate ? false : true,
+        date_expires: !expDate ? null : validDate(expDate).expDate,
       });
       const [[jobId]] = await req.db.query(`
         SELECT job_id FROM Job 
         WHERE employer_id = UNHEX(:user_id)
-        ORDER BY created DESC
+        ORDER BY date_created DESC
         LIMIT 1;
       `,{
         user_id: req.user.user_id
@@ -534,5 +542,5 @@ const bob = 're';
 app.listen(port, () => {
   console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
   console.log('test log')
-  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
+  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`);
 });
