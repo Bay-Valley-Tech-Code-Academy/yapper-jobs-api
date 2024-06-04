@@ -13,12 +13,12 @@ require('dotenv').config();
 
 // Call fetchAndSaveJobs function to fetch and save job data
 //Comment this code block out to avoid fetching data from the API each time you run server
-try {
-  fetchAndSaveJobs();
-  console.log("Fetch API Successful")
-} catch (error) {
-  console.error("Error fetching and saving jobs:", error);
-}
+// try {
+//   fetchAndSaveJobs();
+//   console.log("Fetch API Successful")
+// } catch (error) {
+//   console.error("Error fetching and saving jobs:", error);
+// }
 
 const corsOptions = {
   origin: 'http://localhost:5173', 
@@ -377,9 +377,11 @@ app.use(async function verifyJwt(req, res, next) {
     try {
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
-      writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`)
+      writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      next();
     } catch (err) {
       console.log(err);
+
       if (
         err.message && 
         (err.message.toUpperCase() === 'INVALID TOKEN' || 
@@ -394,6 +396,7 @@ app.use(async function verifyJwt(req, res, next) {
   
         throw((err.status || 500), err.message);
       }
+
     }
   } catch (err) {
     console.warn(err);
@@ -404,12 +407,8 @@ app.use(async function verifyJwt(req, res, next) {
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
-    }
-    
+    } 
   }
-  
-
-  await next();
 });
 
 /*  job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -550,7 +549,74 @@ app.post('/add-job', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
-})
+});
+
+//forget password, should send email to link
+app.post('/forgot-password', async (req, res) => {
+  const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());
+  writer.write(`email sent at : ${setTimerstamp(newTime)} \ `);
+  const {email} = req.body;
+  
+  try {
+    if(!email) {
+        return res.status(400).json({ success: false, error: 'Missing email' });
+    }
+    
+    // Check if the user exists in seekers or employers table
+    const [seeker] = await req.db.query(`SELECT seeker_id FROM Seeker WHERE email = :email`, { email });
+    const [employer] = await req.db.query(`SELECT employer_id FROM Employer WHERE email = :email`, { email });
+
+    const user = seeker.length ? seeker[0] : employer.length ? employer[0] : null;
+    const userType = seeker.length ? 'seeker' : employer.length ? 'employer' : null;
+
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Email not found' });
+    }
+
+    // Generate reset token
+    const resetToken = jwt.sign({ email, userType }, process.env.JWT_KEY, { expiresIn: '1h' });
+
+    // Store the token in the database
+    const tableName = userType === 'seeker' ? 'Seeker' : 'Employer';
+    await req.db.query(`UPDATE ${tableName} SET reset_token = :resetToken WHERE email = :email`, { resetToken, email });
+
+    // Send email with reset link
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+    await sendResetEmail(email, resetLink);
+
+    return res.status(200).json({ success: true, message: 'Email sent' });
+  } catch(err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Server error' });
+  }
+  
+});
+
+//reset password
+app.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_KEY);
+    const { email, userType } = payload;
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update the password in the database
+    const tableName = userType === 'seeker' ? 'Seeker' : 'Employer';
+    await req.db.query(`UPDATE ${tableName} SET user_pass = :hashedPassword, reset_token = NULL WHERE email = :email`, {
+      hashedPassword,
+      email
+    });
+
+    return res.status(200).json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, error: 'Invalid or expired token' });
+  }
+});
 
 // from here
 
