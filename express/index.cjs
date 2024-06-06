@@ -165,6 +165,7 @@ app.post("/register/seeker", async (req, res) => {
 
         res.status(200).json({
           success: true,
+          // id: users.user_id,
           firstName: users.first_name,
           lastName: users.last_name,
           email: users.email,
@@ -378,13 +379,16 @@ app.post("/login/seeker", async (req, res) => {
       };
     }
     const users = await login(req, email, pass, "seeker");
-
+    console.log("User info", users);
     res.status(200).json({
       success: true,
-      firstName: users.first_name,
-      lastName: users.last_name,
-      email: users.email,
-      jwt: users.jwt,
+      user: {
+        // id: users.id ? users.id : "No id found",
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        jwt: users.jwt,
+      },
     });
     writer.write(
       `${setTimestamp(
@@ -755,8 +759,10 @@ app.post("/add-job", async (req, res) => {
 });
 
 // from here
-app.get("/save-job", async (req, res) => {
+//save job to database
+app.post("/save-job", async (req, res) => {
   const seeker_id = req.user.user_id;
+  const email = req.user.email;
   const { job_id } = req.body;
 
   if (!seeker_id || !job_id) {
@@ -773,8 +779,8 @@ app.get("/save-job", async (req, res) => {
         reason: "user not found",
       };
     }
-    await db.query(
-      "SELECT * FROM saved_job",
+    await req.db.query(
+      "INSERT INTO saved_job (seeker_id, job_id) VALUE (UNHEX(:seeker_id), :job_id)",
       {
         seeker_id: seeker_id,
         job_id: job_id,
@@ -787,15 +793,13 @@ app.get("/save-job", async (req, res) => {
   }
 });
 
-
-
-//save jobs to database
-app.post("/save-job", async (req, res) => {
+//fetch saved jobs from database
+app.get("/saved-jobs", async (req, res) => {
   const seeker_id = req.user.user_id;
-  const { job_id } = req.body;
+  const email = req.user.email;
 
-  if (!seeker_id || !job_id) {
-    return res.status(400).json({ error: "Missing seeker_id or job_id" });
+  if (!seeker_id) {
+    return res.status(400).json({ error: "Missing seeker_id" });
   }
 
   try {
@@ -804,25 +808,71 @@ app.post("/save-job", async (req, res) => {
     if (check.exists == false) {
       throw {
         status: 400,
-        error: "failed to save job",
+        error: "failed to get saved jobs",
         reason: "user not found",
       };
     }
-    await db.query(
-      "INSERT INTO saved_jobs (seeker_id, job_id) VALUE (UNHEX(:seeker_id), :job_id)",
+    const [rows] = await req.db.query(
+      `SELECT job.* 
+       FROM saved_job 
+       INNER JOIN job ON saved_job.job_id = job.job_id 
+       WHERE saved_job.seeker_id = UNHEX(:seeker_id)`,
       {
         seeker_id: seeker_id,
-        job_id: job_id,
       }
     );
-    res.status(200).json({ message: "Job saved successfully" });
+    res.status(200).json(rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Failed to save job" });
+    res.status(500).json({ error: "Failed to get saved jobs" });
+  }
+});
+
+//remove job
+app.delete("/saved-jobs/:jobId", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const jobId = req.params.jobId;
+
+  if (!seeker_id || !jobId) {
+    return res.status(400).json({ error: "Missing seeker_id or jobId" });
+  }
+
+  try {
+    const [result] = await req.db.query(
+      `DELETE FROM saved_job WHERE seeker_id = UNHEX(:seeker_id) AND job_id = :jobId`,
+      {
+        seeker_id: seeker_id,
+        jobId: jobId,
+      }
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    res.status(200).json({ message: "Job removed successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to remove job" });
   }
 });
 
 const bob = "re";
+
+//add a logout endpoint
+app.post("/logout", (req, res) => {
+  const newTime = new Date(Date.now()); // for logging
+  writer.write(`${setTimestamp(newTime)} | logout attempt\n`);
+  
+  // Clear client-side data instructions.
+  res.status(200).json({ success: true, message: "Logout successful. Please clear your token from the client." });
+  writer.write(
+      `${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | @${
+          req.socket.remoteAddress
+      }\n`
+  );
+});
+
 
 app.listen(port, () => {
   console.log(
