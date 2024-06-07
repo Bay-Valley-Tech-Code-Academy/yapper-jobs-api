@@ -72,12 +72,12 @@ CREATE TABLE Education (
 
 CREATE TABLE Experience (
 	seeker_id BINARY(16) NOT NULL,
-	job_title TINYTEXT NOT NULL,
-	company_name TINYTEXT NOT NULL,
+	job_title VARCHAR(255) NOT NULL,
+	company_name VARCHAR(255) NOT NULL,
 	remote BOOLEAN NOT NULL,
-	address_street TINYTEXT,
-	address_city TINYTEXT NOT NULL,
-	address_country TINYTEXT NOT NULL,
+	address_street VARCHAR(255),
+	address_city VARCHAR(255) NOT NULL,
+	address_country VARCHAR(255) NOT NULL,
 	date_start DATE NOT NULL,
 	date_end DATE,
 	present BOOLEAN NOT NULL,
@@ -87,14 +87,14 @@ CREATE TABLE Experience (
 
 CREATE TABLE Skill (
 	seeker_id BINARY(16) NOT NULL,
-	skill_name TINYTEXT NOT NULL,
+	skill_name VARCHAR(255) NOT NULL,
 	skill_years TINYINT NOT NULL,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id)
 );
 
 CREATE TABLE Url (
 	seeker_id BINARY(16) NOT NULL,
-	link_name TINYTEXT NOT NULL,
+	link_name VARCHAR(255) NOT NULL,
 	link_url text(2080) NOT NULL,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id)
 );
