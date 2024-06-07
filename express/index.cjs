@@ -382,13 +382,14 @@ app.post("/login/seeker", async (req, res) => {
     console.log("User info", users);
     res.status(200).json({
       success: true,
-      user: {
-        // id: users.id ? users.id : "No id found",
-        firstName: users.firstName,
-        lastName: users.lastName,
-        email: users.email,
-        jwt: users.jwt,
-      },
+      jwt: users.jwt,
+      // user: {
+      //   // id: users.id ? users.id : "No id found",
+      //   firstName: users.firstName,
+      //   lastName: users.lastName,
+      //   email: users.email,
+      //   jwt: users.jwt,
+      // },
     });
     writer.write(
       `${setTimestamp(
@@ -759,6 +760,40 @@ app.post("/add-job", async (req, res) => {
 });
 
 // from here
+
+//fetch user from seeker table
+app.get("/seeker", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const email = req.user.email;
+
+  if (!seeker_id) {
+    return res.status(400).json({ error: "Missing seeker_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to get seeker",
+        reason: "user not found",
+      };
+    }
+    const [rows] = await req.db.query(
+      `SELECT * FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
+      {
+        seeker_id: seeker_id,
+      }
+    );
+    res.status(200).json(rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get seeker" });
+  }
+});
+
+
 //save job to database
 app.post("/save-job", async (req, res) => {
   const seeker_id = req.user.user_id;
@@ -798,7 +833,7 @@ app.get("/saved-jobs", async (req, res) => {
   const seeker_id = req.user.user_id;
   const email = req.user.email;
 
-  if (!seeker_id) {
+  if (!req.user.user_id) {
     return res.status(400).json({ error: "Missing seeker_id" });
   }
 
