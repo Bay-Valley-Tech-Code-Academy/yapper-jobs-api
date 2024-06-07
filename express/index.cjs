@@ -379,7 +379,6 @@ app.post("/login/seeker", async (req, res) => {
       };
     }
     const users = await login(req, email, pass, "seeker");
-    console.log("User info", users);
     res.status(200).json({
       success: true,
       jwt: users.jwt,
@@ -781,7 +780,7 @@ app.get("/seeker", async (req, res) => {
       };
     }
     const [rows] = await req.db.query(
-      `SELECT * FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
+      `SELECT first_name, last_name FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
       {
         seeker_id: seeker_id,
       }
