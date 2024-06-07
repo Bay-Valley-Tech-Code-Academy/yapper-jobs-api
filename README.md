@@ -27,3 +27,10 @@
   - Responses:
     - `{success: true, jobId: <number>}`
     - `{success: false, error: <String>}`
+
++ JWT contents
+  - user_id
+  - email
+  - company //null if not employer
+  - type    //user type
+  - exp
