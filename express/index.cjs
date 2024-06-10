@@ -405,15 +405,24 @@ app.put('/reset-password', async (req, res) => {
     const userId = decoded.id;
     const userType = decoded.type;
 
+    console.log(`Decoded JWT: userId=${userId}, userType=${userType}`);
+
     const hash = await bcrypt.hash(newPassword, 10);
 
     if (userType === 'seeker') {
-      await req.db.query(`UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId`, { hash, userId });
+      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
+      params = { hash, userId };
     } else {
-      await req.db.query(`UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId`, { hash, userId });
+      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
+      params = { hash, userId };
     }
 
+    console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
+
+    await req.db.query(query, params);
+
     writer.write(`${setTimestamp(newTime)} | Password reset for ${userId}\n`);
+
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
     console.warn(err);
