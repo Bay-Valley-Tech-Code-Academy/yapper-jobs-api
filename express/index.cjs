@@ -6,7 +6,7 @@ const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate} = require('./helper.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
 const { title } = require('process');
 require('dotenv').config();
 
@@ -203,7 +203,7 @@ app.post('/register/employer', async (req, res) => {
       !validSAN(email, 255)     ||
       !validSAN(mobile, 15)     ||
       !validSAN(company, 255)   ||
-      !validSAN(website, 2048)  ||
+      !validSAN(website, 2047)  ||
       !validA(industry, 255)
     ) {
       throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
@@ -370,8 +370,7 @@ app.use(async function verifyJwt(req, res, next) {
     try {
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
-      bob(payload)
-      writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`)
+      writer.write(`${setTimestamp(newTime)} | Verified: JWT | ${req.user.email}@${req.socket.remoteAddress}\n`)
       await next();
     } catch (err) {
       console.log(err);
@@ -406,24 +405,6 @@ app.use(async function verifyJwt(req, res, next) {
 
 });
 
-/*  job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    company VARCHAR(255) NOT NULL,
-    city VARCHAR(255) NOT NULL,
-    state VARCHAR(2) NOT NULL,
-    zip int3 NOT NULL,
-    industry VARCHAR(255) NOT NULL,
-    experience_level VARCHAR(255) NOT NULL,
-    employment_type VARCHAR(255) NOT NULL,
-    company_size VARCHAR(255) NOT NULL,
-    salary_low INT NOT NULL,
-    salary_high INT NOT NULL,
-    benefits INT NOT NULL,
-    certifications INT NOT NULL,
-    job_description TEXT NOT NULL,
-    questions JSON,
-    delete_flag BOOLEAN NOT NULL DEFAULT 0,
-    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    employer_id BINARY(16), */
 // Add new job endpoint
 app.post('/job/add', async (req, res) => {
   console.log('Add attempt: job');
@@ -596,10 +577,13 @@ app.post('/resume/add', async (req, res) => {
     if(check.exists === false) {
       throw({status: 400, error: 'failed resume add', reason: check.reason});
     }
-    let sqlStr = '';
+    const sqlStrs = [];
+    let entries = [0,0,0,0,0]
     if(education !== null) {
       const arrEd = Object.values(education);
+      let sqlStr = "INSERT INTO Education\nVALUES ";
       if(arrEd.length > 2) throw({status: 400, error: 'failed resume add', reason: 'too many education inputs'});
+      let i = 0;
       const valid = arrEd.every((entry) => {
         if(
           !entry.institutionName  ||
@@ -619,15 +603,27 @@ app.post('/resume/add', async (req, res) => {
           (entry.dateEnd === null && entry.present === false)   ||
           (entry.dateEnd !== null && entry.present === true)
         ) {return false;}
+        if((entry.dateEnd !== null && validDate(entry.dateEnd))) {
+          if(!validDates(entry.dateStart, entry.dateEnd)) return false;
+        }
         const dateEnd = `DATE_FORMAT("${entry.dateEnd}-01",'%Y-%m-%d')`;
-        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.institutionName}", "${entry.educationLevel}", "${entry.educationField}", DATE_FORMAT('${entry.dateStart}-01','%Y-%m-%d'), ${!entry.dateEnd ? null : dateEnd}, ${entry.present})\n`;
+        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.institutionName}", "${entry.educationLevel}", "${entry.educationField}", DATE_FORMAT('${entry.dateStart}-01','%Y-%m-%d'), ${!entry.dateEnd ? null : dateEnd}, ${entry.present})`;
+        if(i < arrEd.length - 1) {
+          sqlStr += ',\n';
+          i++;
+        }
         return true;
       });
       if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid education input'});
+      sqlStr += ";";
+      entries[0] = arrEd.length;
+      sqlStrs.push(sqlStr);
     }
     if(experience !== null) {
       const arrEx = Object.values(experience);
+      let sqlStr = "INSERT INTO Experience\nVALUES ";
       if(arrEx.length > 3) throw({status: 400, error: 'failed resume add', reason: 'too many experience inputs'});
+      let i = 0;
       const valid = arrEx.every((entry) => {
         if(
           !entry.jobTitle                     ||
@@ -652,17 +648,29 @@ app.post('/resume/add', async (req, res) => {
           (entry.address !== null && entry.remote === true)       ||
           (entry.jobDescription !== null && !validSAN(entry.jobDescription))
         ) {return false;}
+        if((entry.dateEnd !== null && validDate(entry.dateEnd))) {
+          if(!validDates(entry.dateStart, entry.dateEnd)) return false;
+        }
         const jobDescription = `"${entry.jobDescription}"`;
         const address = `"${entry.address}"`;
         const dateEnd = `DATE_FORMAT("${entry.dateEnd}-01",'%Y-%m-%d')`;
-        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.jobTitle}", "${entry.companyName}", ${entry.remote}, ${!entry.address ? null : address}, "${entry.city}", "${entry.state}", DATE_FORMAT("${entry.dateStart}-01",'%Y-%m-%d'), ${!entry.dateEnd ? null : dateEnd}, ${entry.present}, ${!entry.jobDescription ? null : jobDescription})\n`;
+        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.jobTitle}", "${entry.companyName}", ${entry.remote}, ${!entry.address ? null : address}, "${entry.city}", "${entry.state}", DATE_FORMAT("${entry.dateStart}-01",'%Y-%m-%d'), ${!entry.dateEnd ? null : dateEnd}, ${entry.present}, ${!entry.jobDescription ? null : jobDescription})`;
+        if(i < arrEx.length - 1) {
+          sqlStr += ',\n';
+          i++;
+        }
         return true;
       });
       if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid experience input'});
+      sqlStr += ";";
+      entries[1] = arrEx.length;
+      sqlStrs.push(sqlStr);
     }
     if(skill !== null) {
       const arrSk = Object.values(skill);
+      let sqlStr = "INSERT INTO Skill\nVALUES ";
       if(arrSk.length > 25) throw({status: 400, error: 'failed resume add', reason: 'too many skill inputs'});
+      let i = 0;
       const valid = arrSk.every((entry) => {
         if(
           !entry.skillName  ||
@@ -675,32 +683,52 @@ app.post('/resume/add', async (req, res) => {
         if(entry.skillName.length > 255 || entry.skillYears > 50 || entry.skillYears < 1) {
           return false;
         }
+        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.skillName}", ${entry.skillYears})`;
+        if(i < arrSk.length - 1) {
+          sqlStr += ',\n';
+          i++;
+        }
         return true;
       });
       if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid link input'});
+      sqlStr += ";";
+      entries[2] = arrSk.length;
+      sqlStrs.push(sqlStr);
     }
     if(link !== null) {
-      const arrLink = Object.values(link);
-      if(arrLink.length > 5) throw({status: 400, error: 'failed resume add', reason: 'too many link inputs'});
-      const valid = arrLink.every((entry) => {
+      const arrLk = Object.values(link);
+      let sqlStr = "INSERT INTO Url\nVALUES ";
+      if(arrLk.length > 5) throw({status: 400, error: 'failed resume add', reason: 'too many link inputs'});
+      let i = 0;
+      const valid = arrLk.every((entry) => {
         if(
           !entry.linkName ||
           !entry.linkUrl
         ) {return false;}
         if(
           !validSAN(entry.linkName, 255) ||
-          !validSAN(entry.linkUrl, 2048)
+          !validSAN(entry.linkUrl, 2047)
         ) {return false;}
         if(entry.linkName.length > 255 || entry.linkUrl.length > 2048) {
           return false;
         }
+        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.linkName}", "${entry.linkUrl}")`;
+        if(i < arrLk.length - 1) {
+          sqlStr += ',\n';
+          i++;
+        }
         return true;
       });
       if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid link input'});
+      sqlStr += ";";
+      entries[3] = arrLk.length;
+      sqlStrs.push(sqlStr);
     }
     if(publication !== null) {
       const arrPub = Object.values(publication);
+      let sqlStr = "INSERT INTO Publication\nVALUES ";
       if(arrPub.length > 5) throw({status: 400, error: 'failed resume add', reason: 'too many link inputs'});
+      let i = 0;
       const valid = arrPub.every((entry) => {
         if(
           !entry.pubName    ||
@@ -710,18 +738,38 @@ app.post('/resume/add', async (req, res) => {
         ) {return false;}
         if(
           !validSAN(entry.pubName, 255) ||
-          !validSAN(entry.pubUrl, 2048) ||
+          !validSAN(entry.pubUrl, 2047) ||
           !validDate(entry.pubDate)     ||
           !validSAN(entry.pubSummary, 600)
         ) {return false;}
         if(entry.pubName.length > 255 || entry.pubUrl.length > 2048) {
           return false;
         }
+        const jobDescription = `"${entry.jobDescription}"`;
+        const address = `"${entry.address}"`;
+        const dateEnd = `DATE_FORMAT("${entry.dateEnd}-01",'%Y-%m-%d')`;
+        sqlStr += `(UNHEX("${req.user.user_id}"), "${entry.pubName}", "${entry.pubUrl}", DATE_FORMAT("${entry.pubDate}-01",'%Y-%m-%d'), "${entry.pubSummary}")`;
+        if(i < arrPub.length - 1) {
+          sqlStr += ',\n';
+          i++;
+        }
         return true;
       });
-    if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid publication input'});
+      if(!valid) throw({status: 400, error: 'failed resume add', reason: 'invalid publication input'});
+      sqlStr += ";";
+      entries[4] = arrPub.length;
+      sqlStrs.push(sqlStr);
     }
-    writer.write(sqlStr);
+    await req.db.execute(`
+      DELETE
+        FROM Education, Experience, Skill, Url, Publication
+        USING Education, Experience, Skill, Url, Publication
+        WHERE (Education.seeker_id = UNHEX(:user_id) AND Experience.seeker_id = UNHEX(:user_id) AND Skill.seeker_id = UNHEX(:user_id) AND Url.seeker_id = UNHEX(:user_id) AND Publication.seeker_id = UNHEX(:user_id));
+    `,{
+      user_id: req.user.user_id,
+    });
+    sqlStrs.push(`UPDATE Seeker\nSET summary = '${summary}', education_entries = ${entries[0]}, experience_entries = ${entries[1]}, skill_entries = ${entries[2]}, link_entries = ${entries[3]}, publication_entries = ${entries[4]}\nWHERE seeker_id = UNHEX("${req.user.user_id}");`);
+    sqlStrs.every(async (entry) => await req.db.execute(entry));
     res.json({message: "wow"})
   } catch (err) {
     console.warn(err);
