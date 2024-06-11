@@ -207,8 +207,8 @@
 
 
 ## JWT contents
-  user_id
-  email
-  company //null if not employer
-  type    //user type
-  exp
+    user_id
+    email
+    company //null if not employer
+    type    //user type
+    exp
