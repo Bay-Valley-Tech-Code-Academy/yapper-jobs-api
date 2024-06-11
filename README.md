@@ -1,6 +1,8 @@
 # API
   `<String>` max length is 255 unless otherwise (noted)
+  
   `<Date>` in the format "YYYY-MM[-DD]"
+  
   `<JSON>` expect no nesting unless otherwise (noted)
 
 ## Endpoint: /register/seeker
