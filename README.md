@@ -205,10 +205,23 @@
         }
     }
 
+# JWT
+  ## Login JWT contents
+    {
+      user_id: <String>,
+      email: <String>,
+      company: <String || null>,
+      type: <String>, //user type
+      exp: <number>
+    }
 
-## JWT contents
-    user_id
-    email
-    company //null if not employer
-    type    //user type
-    exp
+# Log
+  ## Format
+    <timestamp> | [status] | <source> | [success || error || info] | [reason] | <attempt + ip || ip>\n
+  status should only be used when logging response to request.
+  
+  reason should only be used if an error occurs.
+
+  ## Examples
+    writer.write(`${setTimestamp(newTime)} | status: 400 | source: /login/seeker | error: "Login failed" | reason: "User not found" | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(time)} | | source: server | info: server started | | port: ${port}\n`);
