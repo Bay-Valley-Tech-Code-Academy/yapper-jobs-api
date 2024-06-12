@@ -6,14 +6,17 @@
   `<JSON>` expect no nesting unless otherwise (noted)
 
 ## Endpoint: /register/seeker
-  ### Expects:
+  Expects:
+  
     {
       firstName: <String>,
       lastName: <String>,
       pass: <String>,
       email: <String>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       firstName: <String>,
@@ -28,7 +31,8 @@
     }
 
 ## Endpoint: /register/employer
-  ### Expects:
+  Expects:
+  
     {
       firstName: <String>,
       lastName: <String>,
@@ -39,7 +43,9 @@
       website: <String(2047)>,
       industry: <String>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       firstName: <String>,
@@ -55,12 +61,15 @@
     }
 
 ## Endpoint: /login/seeker
-  ### Expects:
+  Expects:
+  
     {
       email: <String>,
       pass: <String>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       firstName: <String>,
@@ -75,12 +84,15 @@
     }
 
 ## Endpoint: /login/employer
-  ### Expects:
+  Expects:
+  
     {
       email: <String>,
       pass: <String>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       firstName: <String>,
@@ -96,7 +108,8 @@
     }
 
 ## Endpoint: /job/add
-  ### Expects:
+  Expects:
+  
     {
       title: <String>,
       city: <String>,
@@ -113,7 +126,9 @@
       questions: <JSON{Strings} || null>,
       expDate: <Date || null>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       jobId: <number>
@@ -125,7 +140,8 @@
     }
 
 ## Endpoint: /resume/add
-  ### Expects:
+  Expects:
+  
     {
       summary: <String(600)>,
       education: <JSON(2): {
@@ -173,7 +189,9 @@
         }
       } || null>
     }
-  ### Responses:
+    
+  Responses:
+  
     {
       success: true,
       jobId: <number>
