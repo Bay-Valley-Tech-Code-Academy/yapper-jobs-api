@@ -280,15 +280,35 @@ app.post('/login/seeker', async (req, res) => {
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass, 'seeker');
+    const [[users]] = await req.db.query(`SELECT :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
+      WHERE (email = :email AND delete_flag = 0);`,
+      {email: email}
+    );
+    if (!users) {
+      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
+    }
+    const dbPassword = `${users.user_pass}`;
+    const compare = await bcrypt.compare(pass, dbPassword);
+    if(!compare) {
+      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
+    }
+    const payload = {
+      user_id: users.user_id,
+      // firstName: users.first_name,
+      // lastName: users.last_name,
+      email: users.email,
+      exp: timeNow + (60 * 60 * 24 * 7 * 2)
+    }
+    
+    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
     
     res.status(200)
     .json({
       success: true, 
-      firstName: users.first_name,
-      lastName: users.last_name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
-      jwt: users.jwt
+      jwt: encodedUser
     });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
@@ -316,14 +336,17 @@ app.post('/login/employer', async (req, res) => {
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
     }
-    if(!validSAN(email) || !validSAN(pass)) {
+    if(
+      !validSAN(email) ||
+      !validSAN(pass)
+    ) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
+    check = await checkUser(req, email, `employer`);
     if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass, 'employer');
+    const users = await login(req, email, pass);
     
     res.status(200).json({
       success: true,
@@ -346,7 +369,6 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
-
 //fetch jobs table from database
 app.get('/api/jobs', async (req, res) => {
   try {
@@ -361,7 +383,7 @@ app.get('/api/jobs', async (req, res) => {
 //forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
   const newTime = new Date(Date.now());
-  writer.write(`email sent at : ${setTimestamp(newTime)} \ `);
+  writer.write(`${setTimestamp(newTime)} | Email sent: success\n`);
   const { email } = req.body;
 
   try {
@@ -370,10 +392,17 @@ app.post('/forgot-password', async (req, res) => {
     }
 
     // Check if the user exists in seekers or employers table
-    const [seeker] = await req.db.query(`SELECT seeker_id FROM Seeker WHERE email = :email`, { email });
-    const [employer] = await req.db.query(`SELECT employer_id FROM Employer WHERE email = :email`, { email });
+    const [seeker] = await req.db.query(`SELECT seeker_id FROM Seeker WHERE email = :email AND delete_flag = 0;`, { email });
+    const [employer] = await req.db.query(`SELECT employer_id FROM Employer WHERE email = :email AND delete_flag = 0;`, { email });
 
-    if (!seeker.length && !employer.length) {
+    let userId, userType;
+    if (seeker.length) {
+      userId = seeker[0].seeker_id;
+      userType = 'seeker';
+    } else if (employer.length) {
+      userId = employer[0].employer_id;
+      userType = 'employer';
+    } else {
       return res.status(404).json({ success: false, error: 'Email not found' });
     }
 
@@ -409,12 +438,15 @@ app.put('/reset-password', async (req, res) => {
 
     const hash = await bcrypt.hash(newPassword, 10);
 
+    let query, params;
     if (userType === 'seeker') {
       query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
       params = { hash, userId };
-    } else {
+    } else if (userType === 'employer') {
       query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
       params = { hash, userId };
+    } else {
+      return res.status(400).json({ success: false, error: 'Invalid user type' });
     }
 
     console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
