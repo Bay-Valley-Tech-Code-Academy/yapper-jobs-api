@@ -383,7 +383,7 @@ app.get('/api/jobs', async (req, res) => {
 //forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | Email sent: success\n`);
+  writer.write(`email sent at : ${setTimestamp(newTime)} \ `);
   const { email } = req.body;
 
   try {
@@ -407,7 +407,7 @@ app.post('/forgot-password', async (req, res) => {
     }
 
     // Generate reset token and send email
-    const resetToken = jwt.sign({ email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetToken = jwt.sign({ email, id: userId, type: userType }, process.env.JWT_SECRET, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
     // Send email (assuming sendEmail is a function defined in Email.js)
@@ -439,6 +439,7 @@ app.put('/reset-password', async (req, res) => {
     const hash = await bcrypt.hash(newPassword, 10);
 
     let query, params;
+
     if (userType === 'seeker') {
       query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
       params = { hash, userId };
@@ -453,11 +454,12 @@ app.put('/reset-password', async (req, res) => {
 
     await req.db.query(query, params);
 
-    writer.write(`${setTimestamp(newTime)} | Password reset for ${userId}\n`);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userIp}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
     console.warn(err);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userIp}\n`);
     res.status(500).json({ success: false, error: 'Server failure' });
   }
 });
