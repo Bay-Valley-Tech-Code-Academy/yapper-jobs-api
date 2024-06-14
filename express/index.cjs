@@ -282,8 +282,8 @@ app.post('/login/seeker', async (req, res) => {
     res.status(200)
     .json({
       success: true, 
-      firstName: users.first_name,
-      lastName: users.last_name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
       jwt: encodedUser
     });
