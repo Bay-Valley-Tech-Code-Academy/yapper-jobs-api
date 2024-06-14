@@ -8,6 +8,11 @@ const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for a
 const TLAbbr = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
 
+// for testing
+function bob(msg) {
+  console.log(msg);
+}
+
 function setTimestamp (timeUpdate) {
   const months = (timeUpdate.getMonth() < 10) ? '0' + timeUpdate.getMonth() : timeUpdate.getMonth();
   const days = (timeUpdate.getDate() < 10) ? '0' + timeUpdate.getDate() : timeUpdate.getDate();
@@ -18,13 +23,41 @@ function setTimestamp (timeUpdate) {
   return formatted;
 }
 
-function validSAN (check) {
+// parse integer
+function iPar(str) {
+  return Number.parseInt(str, 10);
+}
+
+function validSAN (check, len) {
   if(typeof(check) === 'string') {
-    const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
+    if(check.length < 3 || check.length > len) return false;
+    const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
     const checked = pattern.test(check);
     return checked;
   }
   return false;
+}
+
+function validJSON (check) {
+  const newTime = new Date(Date.now());
+  if(check === undefined || check === null) return true;
+  if(typeof(check) !== 'object') return false;
+  try{
+    const arr = Object.values(check);
+    const valid = arr.every((entry) => {
+      if(typeof(entry) !== 'string' && typeof(entry) !== 'object' && typeof(entry) !== 'boolean' && typeof(entry) !== 'number') return false;
+      if(typeof(entry) === 'object') {
+        const valid2 = validJSON(entry);
+        if(!valid2) return false;
+      }
+      return true;
+    });
+    return valid;
+  } catch (err) {
+    console.warn(err);
+    writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+    return false;
+  }
 }
 
 module.exports = {
@@ -172,14 +205,16 @@ module.exports = {
 
   // validate input
   // alpha
-  validA: function (check) {
+  validA: function (check, len) {
     if(typeof(check) === 'string') {
-      const pattern = /^[A-Za-z]+$/g;
+      if(check.length < 3 || check.length > len) return false;
+      const pattern = /^[A-Za-z ]+$/g;
       const checked = pattern.test(check);
       return checked;
     }
     return false;
   },
+
   // numeric
   validN: function (check) {
     if(typeof(check) === 'number') {
@@ -189,24 +224,40 @@ module.exports = {
     }
     return false;
   },
+
   // alphanumeric
-  validAN: function (check) {
+  validAN: function (check, len) {
     if(typeof(check) === 'string') {
-      const pattern = /^[A-Za-z0-9]+$/g;
+      if(check.length < 3 || check.length > len) return false;
+      const pattern = /^[A-Za-z 0-9]+$/g;
       const checked = pattern.test(check);
       return checked;
     }
     return false;
   },
+  
   // special characters + alphanumeric
-  validSAN: function (check) {
+  validSA: function (check, len) {
     if(typeof(check) === 'string') {
-      const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
+      if(check.length < 3 || check.length > len) return false;
+      const pattern = /^[A-Za-z \!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
       const checked = pattern.test(check);
       return checked;
     }
     return false;
   },
+
+  // special characters + alphanumeric
+  validSAN: function (check, len) {
+    if(typeof(check) === 'string') {
+      if(check.length < 3 || check.length > len) return false;
+      const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
+      const checked = pattern.test(check);
+      return checked;
+    }
+    return false;
+  },
+
   // state
   validState: function (check) {
     if(typeof(check) === 'string') {
@@ -217,16 +268,107 @@ module.exports = {
     }
     return false;
   },
-  // json we get should only be strings
+
+  // json
   validJSON: function (check) {
-    console.log(check)
-    if(check === undefined || check === null) return true;
+    const newTime = new Date(Date.now());
+    if(check === null) return true;
+    if(typeof(check) !== 'object') return false;
     try{
       const arr = Object.values(check);
-      const valid = arr.entries((entry) => validSAN(entry));
+      const valid = arr.every((entry) => {
+        if(typeof(entry) !== 'string' && typeof(entry) !== 'object' && typeof(entry) !== 'boolean' && typeof(entry) !== 'number') return false;
+        if(typeof(entry) === 'object') {
+          const valid2 = validJSON(entry);
+          if(!valid2) return false;
+        }
+        return true;
+      });
       return valid;
     } catch (err) {
       console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return false;
+    }
+  },
+
+  // date const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/
+  validDate: function (check) {
+    const newTime = new Date(Date.now());
+    const pattern = /^[1-2][0-9][0-9][0-9]-[0-1][0-9]+$/;
+    if(!pattern.test(check)) return false;
+    try{
+      const arr = check.split('-');
+      const year = iPar(arr[0]);
+      if(year > newTime.getFullYear() || year < 1950) return false;
+      const checkDate = new Date(check);
+      const newCheck = checkDate.getTime();
+      const newMax = newTime.getTime();
+      return newCheck < newMax ? true : false;
+    } catch (err) {
+      console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return false;
+    }
+  },
+
+  // non-paradoxical dates
+  validDates: function (check, check2) {
+    const newTime = new Date(Date.now());
+    try{
+      const arr = check.split('-');
+      const year = iPar(arr[0]);
+      const month = iPar(arr[1]);
+      let day;
+      if(arr[2] !== undefined) {
+        day = iPar(arr[2]);
+      }
+      const arr2 = check2.split('-');
+      const year2 = iPar(arr2[0]);
+      const month2 = iPar(arr2[1]);
+      let day2;
+      if(arr2[2] !== undefined) {
+        day2 = iPar(arr2[2]);
+      }
+      if(year <= year2) {
+        if(month <= month2) {
+          if(arr[2] && arr2[2] && year === year2 && month === month2) {
+            if(day > day2) return false;
+          }
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return false;
+    }
+  },
+
+  // expiration date
+  validExpDate: function (check) {
+    const newTime = new Date(Date.now());
+    const pattern = /^2[0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]+$/;
+    if(check === null) return {valid: true};
+    if(!pattern.test(check)) return {valid: false};
+    try{
+      const arr = check.split('-');
+      const year = Number.parseInt(arr[0], 10);
+      if(year < newTime.getFullYear() || year > 3000) return {valid: false};
+      const expDate = new Date(check);
+      const newExp = (expDate.getTime() / (24 * 60 * 60 * 1000));
+      const expUnix = ((newExp * 24 * 60) + expDate.getTimezoneOffset()) * 60 * 1000;
+      const newMin = Math.floor((newTime.getTime() / (24 * 60 * 60 * 1000)) + 15);
+      const minUnix = ((newMin * 24 * 60) + newTime.getTimezoneOffset()) * 60 * 1000;
+      return {
+        valid: expUnix >= minUnix ? true : false,
+        expDate: new Date(expUnix),
+      };
+    } catch (err) {
+      console.warn(err);
+      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      return {valid: false};
     }
   },
 }
