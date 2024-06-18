@@ -10,7 +10,7 @@ const { fetchAndSaveJobs } = require('./jobDataHandler');
 const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
 const { title } = require('process');
 const { sendEmail } = require('./Email.js');
-const { Buffer } = require('buffer');
+// const { Buffer } = require('buffer');
 
 require('dotenv').config();
 
@@ -392,13 +392,13 @@ app.post('/forgot-password', async (req, res) => {
     }
 
      // Use checkUser helper function
-     const userCheckResult = await checkUser(req, email);
+     const user = await checkUser(req, email);
 
-     if (!userCheckResult.exists) {
+     if (!user.exists) {
          return res.status(404).json({ success: false, error: 'Email not found' });
      }
 
-    const { usertype, userId } = userCheckResult;
+    const { usertype, userId } = user;
     // const userIdHex = userId.toString('hex'); // Convert binary ID to hexadecimal string
 
     // Create a reset token
@@ -426,19 +426,19 @@ app.put('/reset-password', async (req, res) => {
 
     const user = jwt.verify(token, process.env.JWT_KEY);
     const userId = user.id;
-    const userType = user.type;
+    const usertype = user.type;
 
-    console.log(`Decoded JWT: userId = ${userId}, usertype=${usertype}`);
+    console.log(`Decoded JWT: userId = ${userId}, type=${usertype}`);
 
     const hash = await bcrypt.hash(newPassword, 10);
 
     let query, params;
 
     if (userType === 'seeker') {
-      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
+      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId AND delete_flag = 0;';
       params = { hash, userId };
     } else {
-      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
+      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId AND delete_flag = 0;';
       params = { hash, userId };
     }
 
@@ -455,7 +455,6 @@ app.put('/reset-password', async (req, res) => {
     res.status(500).json({ success: false, error: 'Server failure' });
   }
 });
-
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
