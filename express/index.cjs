@@ -10,7 +10,7 @@ const { fetchAndSaveJobs } = require('./jobDataHandler');
 const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
 const { title } = require('process');
 const { sendEmail } = require('./Email.js');
-const nodemailer = require("nodemailer");
+const { Buffer } = require('buffer');
 
 require('dotenv').config();
 
@@ -380,7 +380,7 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-//forget password, should send email to link
+// forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
   const newTime = new Date(Date.now());
   writer.write(`${setTimestamp(newTime)} | status: 250 | source: forgot-password | [success] | [Email successfully sent]\n `);
@@ -405,26 +405,12 @@ app.post('/forgot-password', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Email not found' });
     }
 
-    //reference just to get id from tables
-
-    // const [[users]] = await req.db.query(`SELECT :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
-    //   WHERE (email = :email AND delete_flag = 0);`,
-    //   {email: email}
-    // );
-
-    // const payload = {
-    //   user_id: users.user_id,
-    //   // firstName: users.first_name,
-    //   // lastName: users.last_name,
-    //   email: users.email,
-    //   exp: timeNow + (60 * 60 * 24 * 7 * 2)
-    // }
-
     const userType = seeker.length ? 'seeker' : 'employer';
     const userId = seeker.length ? seeker[0].seeker_id : employer[0].employer_id;
+    const userIdHex = userId.toString('hex'); // Convert binary ID to hexadecimal string
 
-    //id: userId,
-    const resetToken = jwt.sign({email, type: userType}, process.env.JWT_KEY, { expiresIn: '1h' });
+    // Create a reset token
+    const resetToken = jwt.sign({email, id: userIdHex, type: userType}, process.env.JWT_KEY, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
@@ -436,7 +422,7 @@ app.post('/forgot-password', async (req, res) => {
   }
 });
 
-//reset password
+// reset password
 app.put('/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
   const newTime = new Date(Date.now());
@@ -447,7 +433,7 @@ app.put('/reset-password', async (req, res) => {
     }
 
     const user = jwt.verify(token, process.env.JWT_KEY);
-    const userId = user.id;
+    const userIdHex = user.id;
     const userType = user.type;
 
     console.log(`Decoded JWT: userId = ${userId}, userType=${userType}`);
@@ -458,25 +444,26 @@ app.put('/reset-password', async (req, res) => {
 
     if (userType === 'seeker') {
       query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
-      params = { hash, userType };
+      params = { hash, userIdHex };
     } else {
       query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
-      params = { hash, userType };
+      params = { hash, userIdHex };
     }
 
     console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
 
     await req.db.query(query, params);
 
-    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userType}\n`);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userId}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userType}\n`);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userId}\n`);
     res.status(500).json({ success: false, error: 'Server failure' });
   }
 });
+
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
