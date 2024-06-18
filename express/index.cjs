@@ -395,24 +395,22 @@ app.post('/forgot-password', async (req, res) => {
     const [seeker] = await req.db.query(`SELECT seeker_id FROM Seeker WHERE email = :email AND delete_flag = 0;`, { email });
     const [employer] = await req.db.query(`SELECT employer_id FROM Employer WHERE email = :email AND delete_flag = 0;`, { email });
 
-    let userId, userType;
-    
-    if (seeker.length) {
-      userId = seeker[0].seeker_id;
-      userType = 'seeker';
-    } else if (employer.length) {
-      userId = employer[0].employer_id;
-      userType = 'employer';
-    } else {
+    if (!seeker.length && !employer.length) {
       return res.status(404).json({ success: false, error: 'Email not found' });
     }
 
-    // Generate reset token and send email
-    const resetToken = jwt.sign({ email, id: userId, type: userType }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // const payload = {
+    //   email,
+    //   "sub": "user_id",
+    //   "type": "password_reset"
+    // };
+
+    // Generate reset token
+    const resetToken = jwt.sign({email}, process.env.JWT_KEY, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
     // Send email (assuming sendEmail is a function defined in Email.js)
-    // await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
+    await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
 
     res.status(200).json({ success: true, message: 'Reset link sent to email', resetToken });
   } catch (err) {
@@ -425,51 +423,39 @@ app.post('/forgot-password', async (req, res) => {
 app.put('/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
   const newTime = new Date(Date.now());
-  let userId;
 
   try {
-      if (!token || !newPassword) {
-          return res.status(400).json({ success: false, error: 'Missing token or new password' });
-      }
+    if (!token || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Missing token or new password' });
+    }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      userId = decoded.id;
-      const userType = decoded.type;
+    const user = jwt.verify(token, process.env.JWT_KEY);
+    const userId = user.id;
+    const userType = user.type;
 
-      console.log(`Decoded JWT: userId=${userId}, userType=${userType}`);
+    console.log(`Decoded JWT: userId=${userId}, userType=${userType}`);
 
-      const hash = await bcrypt.hash(newPassword, 10);
+    const hash = await bcrypt.hash(newPassword, 10);
 
-      let query;
-      let params = [hash, userId];
+    if (userType === 'seeker') {
+      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
+      params = { hash, userId };
+    } else {
+      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
+      params = { hash, userId };
+    }
 
-      // if (userType === 'seeker') {
-      //     query = 'UPDATE Seeker SET user_pass = ? WHERE seeker_id = ?';
-      // } else if (userType === 'employer') {
-      //     query = 'UPDATE Employer SET user_pass = ? WHERE employer_id = ?';
-      // } else {
-      //     return res.status(400).json({ success: false, error: 'Invalid user type' });
-      // }
+    console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
 
-      if (userType === 'seeker') {
-        query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
-        params = { hash, userId };
-      } else {
-        query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
-        params = { hash, userId };
-      }
+    await req.db.query(query, params);
 
-      console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userId}\n`);
 
-      await req.db.query(query, params);
-
-      writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userId}\n`);
-
-      res.status(200).json({ success: true, message: 'Password reset successful' });
+    res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
-      console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userId}\n`);
-      res.status(500).json({ success: false, error: 'Server failure' });
+    console.warn(err);
+    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userId}\n`);
+    res.status(500).json({ success: false, error: 'Server failure' });
   }
 });
 
