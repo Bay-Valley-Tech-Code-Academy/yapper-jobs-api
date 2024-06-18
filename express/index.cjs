@@ -391,26 +391,18 @@ app.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing email' });
     }
 
-    // Check if the user exists in seekers or employers table
-    const [seeker] = await req.db.query(
-      `SELECT seeker_id FROM Seeker WHERE email = :email AND delete_flag = 0;`, 
-      { email: email }
-    );
-    const [employer] = await req.db.query(
-      `SELECT employer_id FROM Employer WHERE email = :email AND delete_flag = 0;`, 
-      { email: email }
-    );
+     // Use checkUser helper function
+     const userCheckResult = await checkUser(req, email);
 
-    if (!seeker.length && !employer.length) {
-      return res.status(404).json({ success: false, error: 'Email not found' });
-    }
+     if (!userCheckResult.exists) {
+         return res.status(404).json({ success: false, error: 'Email not found' });
+     }
 
-    const userType = seeker.length ? 'seeker' : 'employer';
-    const userId = seeker.length ? seeker[0].seeker_id : employer[0].employer_id;
-    const userIdHex = userId.toString('hex'); // Convert binary ID to hexadecimal string
+    const { usertype, userId } = userCheckResult;
+    // const userIdHex = userId.toString('hex'); // Convert binary ID to hexadecimal string
 
     // Create a reset token
-    const resetToken = jwt.sign({email, id: userIdHex, type: userType}, process.env.JWT_KEY, { expiresIn: '1h' });
+    const resetToken = jwt.sign({email, id: userId, type: usertype}, process.env.JWT_KEY, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
@@ -433,10 +425,10 @@ app.put('/reset-password', async (req, res) => {
     }
 
     const user = jwt.verify(token, process.env.JWT_KEY);
-    const userIdHex = user.id;
+    const userId = user.id;
     const userType = user.type;
 
-    console.log(`Decoded JWT: userId = ${userId}, userType=${userType}`);
+    console.log(`Decoded JWT: userId = ${userId}, usertype=${usertype}`);
 
     const hash = await bcrypt.hash(newPassword, 10);
 
@@ -444,10 +436,10 @@ app.put('/reset-password', async (req, res) => {
 
     if (userType === 'seeker') {
       query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId';
-      params = { hash, userIdHex };
+      params = { hash, userId };
     } else {
       query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId';
-      params = { hash, userIdHex };
+      params = { hash, userId };
     }
 
     console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
