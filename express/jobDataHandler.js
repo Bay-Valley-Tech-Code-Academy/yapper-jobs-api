@@ -25,6 +25,22 @@ const fetchJSearchAPI = async (position = "Software Developer") => {
   }
 };
 
+//function to convert the employment type to a more readable format
+const getEmploymentTypeDescription = (employmentType) => {
+  switch (employmentType) {
+    case "FULLTIME":
+      return "Full-Time";
+    case "PARTTIME":
+      return "Part-Time";
+    case "INTERN":
+      return "Internship";
+    case "CONTRACTOR":
+      return "Contract";
+    default:
+      return employmentType; // Fallback to the original value if no match is found
+  }
+};
+
 const insertJobsIntoDatabase = async (jobData) => {
   try {
     // Connect to the database
@@ -43,19 +59,33 @@ const insertJobsIntoDatabase = async (jobData) => {
       } else {
         experienceLevel = "Experience required";
       }
+
+      // Convert benefits array to JSON string or set to null
+      const benefits = job.job_benefits
+        ? JSON.stringify(job.job_benefits)
+        : null; 
+
+      //apply function to convert employment type to the property
+      const employmentTypeDescription = getEmploymentTypeDescription(
+        job.job_employment_type
+      );
+
       await connection.execute(
-        "INSERT INTO job (title, company, city, state, is_remote, employment_type, experience_level, job_description) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO job (title, company, city, state, is_remote, employment_type, experience_level, job_description, salary_low, salary_high, benefits, website, industry) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           job.job_title, // title
           job.employer_name, //company
           job.job_city, //city
           job.job_state, //state
           job.job_is_remote ? 1 : 0, //is_remote
-          job.job_employment_type, //employment_type
+          employmentTypeDescription, //employment type
           experienceLevel, //experience_level
           job.job_description, //job_description
-          //   job.job_min_salary || "Not specified",
-          //   job.job_max_salary || "Not specified",
+          job.job_min_salary || null,
+          job.job_max_salary || null,
+          benefits,
+          job.employer_website || "Not specified",
+          job.employer_company_type || "Not specified",
         ]
       );
     }

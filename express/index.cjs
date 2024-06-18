@@ -1,25 +1,14 @@
-const express = require("express");
-const cors = require("cors");
-const mysql = require("mysql2/promise");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const bodyParser = require("body-parser");
-const fs = require("fs");
-const { rateLimit } = require("express-rate-limit");
-const { fetchAndSaveJobs } = require("./jobDataHandler");
-const {
-  checkUser,
-  checkAuth,
-  login,
-  setTimestamp,
-  validSAN,
-  validA,
-  validN,
-  validState,
-  validJSON,
-} = require("./helper.js");
-const { title } = require("process");
-require("dotenv").config();
+const express = require('express');
+const cors = require('cors');
+const mysql = require('mysql2/promise');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const bodyParser = require('body-parser');
+const fs = require('fs');
+const { rateLimit } = require('express-rate-limit')
+const {checkUser, login, setTimestamp, validSAN} = require('./helper.js');
+require('dotenv').config();
+const { fetchAndSaveJobs } = require('./jobDataHandler.js');
 
 // Call fetchAndSaveJobs function to fetch and save job data
 //Comment this code block out to avoid fetching data from the API each time you run server
@@ -31,16 +20,17 @@ require("dotenv").config();
 // }
 
 const corsOptions = {
-  origin: "http://localhost:5173",
+  origin: "*",
   credentials: true,
   optionSuccessStatus: 200,
 };
 
-const time = new Date(Date.now()); // used to log server start
-const writer = fs.createWriteStream("./ape.log", { flags: "a" }); // open log for appending, creates file if it does not exist
+const time = new Date(Date.now());// used to log server start
+const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
-const port = process.env.PORT; // default port
+const port = process.env.PORT || 3000; // default port
+// const port = 127.0.0.1; // default port
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
@@ -117,24 +107,11 @@ app.post("/register/seeker", async (req, res) => {
   const { firstName, lastName, pass, email } = req.body;
   try {
     // check if input exists and is safe
-    if (!firstName || !lastName || !pass || !email) {
-      throw {
-        status: 400,
-        error: "failed seeker add",
-        reason: "missing field",
-      };
+    if(firstName == null || lastName == null || pass == null || email == null) {
+      throw({status: 400, error: 'failed seeker add', reason: 'missing field'});
     }
-    if (
-      !validA(firstName) ||
-      !validA(lastName) ||
-      !validSAN(pass) ||
-      !validSAN(email)
-    ) {
-      throw {
-        status: 400,
-        error: "failed seeker add",
-        reason: "invalid input",
-      };
+    if(!validSAN(firstName) || !validSAN(lastName) || !validSAN(pass) || !validSAN(email)) {
+      throw({status: 400, error: 'failed seeker add', reason: 'invalid input'});
     }
     // check if user or email already exists
     let check;
@@ -250,15 +227,15 @@ app.post("/register/employer", async (req, res) => {
         reason: "missing field",
       };
     }
-    if (
-      !validA(firstName) ||
-      !validA(lastName) ||
+    if(
+      !validSAN(firstName) ||
+      !validSAN(lastName) ||
       !validSAN(pass) ||
       !validSAN(email) ||
       !validSAN(mobile) ||
       !validSAN(company) ||
       !validSAN(website) ||
-      !validA(industry)
+      !validSAN(industry)
     ) {
       throw {
         status: 400,
@@ -280,21 +257,20 @@ app.post("/register/employer", async (req, res) => {
           `
           INSERT INTO Employer (employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
           VALUES (uuid_to_bin(uuid()), :first_name, :last_name, :pass, :email, :mobile, :company, :website, industry);
-        `,
-          {
-            first_name: firstName,
-            last_name: lastName,
-            pass: hash,
-            email: email,
-            mobile: mobile,
-            company: company,
-            website: website,
-            industry: industry,
-          }
-        );
-        const users = await login(req, email, pass, "employer");
-        console.log(user);
-        res.status(200).json({
+        `, {
+          first_name: firstName,
+          last_name: lastName,
+          pass: hash,
+          email: email,
+          mobile: mobile,
+          company: company,
+          website: website,
+          industry: industry
+        });
+        const users = await login(req, email, pass, 'employer');
+        
+        res.status(200)
+        .json({
           success: true,
           firstName: users.firstName,
           lastName: users.lastName,
@@ -302,13 +278,8 @@ app.post("/register/employer", async (req, res) => {
           company: users.company,
           jwt: users.jwt,
         });
-        writer.write(
-          `${setTimestamp(
-            newTime
-          )} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | @${
-            req.socket.remoteAddress
-          }\n`
-        );
+        console.log('USER', user);
+        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({ success: false, error: "server failure" });
         console.warn(err);
@@ -323,26 +294,13 @@ app.post("/register/employer", async (req, res) => {
     });
   } catch (err) {
     console.warn(err);
-    if (!err.reason) {
-      res.status(500).json({ success: false, error: "server failure" });
-      writer.write(
-        `${setTimestamp(
-          newTime
-        )} | status: 500 | source: /register/employer | error: ${err} | attempt: ${email}@${
-          req.socket.remoteAddress
-        }\n`
-      );
-    } else {
-      res
-        .status(!err.status ? 500 : err.status)
-        .json({ success: false, error: err.reason });
-      writer.write(
-        `${setTimestamp(newTime)} | status: ${
-          !err.status ? 500 : err.status
-        } | source: /register/employer | error: ${err.error} | reason: ${
-          err.reason
-        } | attempt: ${email}@${req.socket.remoteAddress}\n`
-      );
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n\n`);
     }
   }
 });
@@ -378,17 +336,35 @@ app.post("/login/seeker", async (req, res) => {
         reason: "user not found",
       };
     }
-    const users = await login(req, email, pass, "seeker");
-    res.status(200).json({
-      success: true,
-      jwt: users.jwt,
-      // user: {
-      //   // id: users.id ? users.id : "No id found",
-      //   firstName: users.firstName,
-      //   lastName: users.lastName,
-      //   email: users.email,
-      //   jwt: users.jwt,
-      // },
+    const [[users]] = await req.db.query(`SELECT :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
+      WHERE (email = :email AND delete_flag = 0);`,
+      {email: email}
+    );
+    if (!users) {
+      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
+    }
+    const dbPassword = `${users.user_pass}`;
+    const compare = await bcrypt.compare(pass, dbPassword);
+    if(!compare) {
+      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
+    }
+    const payload = {
+      user_id: users.user_id,
+      // firstName: users.first_name,
+      // lastName: users.last_name,
+      email: users.email,
+      exp: timeNow + (60 * 60 * 24 * 7 * 2)
+    }
+    
+    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
+    
+    res.status(200)
+    .json({
+      success: true, 
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      jwt: encodedUser
     });
     writer.write(
       `${setTimestamp(
@@ -439,23 +415,18 @@ app.post("/login/employer", async (req, res) => {
         reason: "missing field",
       };
     }
-    if (!validSAN(email) || !validSAN(pass)) {
-      throw {
-        status: 400,
-        error: "failed employer login",
-        reason: "invalid input",
-      };
+    if(
+      !validSAN(email) ||
+      !validSAN(pass)
+    ) {
+      throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
-    if (check.exists == false) {
-      throw {
-        status: 400,
-        error: "failed employer login",
-        reason: "user not found",
-      };
+    check = await checkUser(req, email, `employer`);
+    if(check.exists == false) {
+      throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass, "employer");
-
+    const users = await login(req, email, pass);
+    
     res.status(200).json({
       success: true,
       firstName: users.firstName,
@@ -779,13 +750,13 @@ app.get("/seeker", async (req, res) => {
         reason: "user not found",
       };
     }
-    const [rows] = await req.db.query(
+    const [seeker] = await req.db.query(
       `SELECT first_name, last_name FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
       {
         seeker_id: seeker_id,
       }
     );
-    res.status(200).json(rows[0]);
+    res.status(200).json(seeker[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to get seeker" });
@@ -909,9 +880,6 @@ app.post("/logout", (req, res) => {
 
 
 app.listen(port, () => {
-  console.log(
-    `server started on http://${process.env.DB_HOST}:${port} @ ${time}`
-  );
-  console.log("test log");
-  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`);
+  console.log(`server started on http://localhost:${port} @ ${time}`);
+  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });
