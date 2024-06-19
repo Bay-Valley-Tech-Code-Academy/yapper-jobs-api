@@ -383,7 +383,6 @@ app.get('/api/jobs', async (req, res) => {
 // forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | status: 250 | source: forgot-password | [success] | [Email successfully sent]\n `);
   const { email } = req.body;
 
   try {
@@ -407,7 +406,9 @@ app.post('/forgot-password', async (req, res) => {
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
 
-    res.status(200).json({ success: true, message: 'Reset link sent to email', resetToken });
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success | Email successfully sent\n `);
+
+    res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, error: 'Server failure' });
@@ -418,6 +419,7 @@ app.post('/forgot-password', async (req, res) => {
 app.put('/reset-password', async (req, res) => {
   const { token, newPassword } = req.body;
   const newTime = new Date(Date.now());
+  let userId, usertype;
 
   try {
     if (!token || !newPassword) {
@@ -425,33 +427,29 @@ app.put('/reset-password', async (req, res) => {
     }
 
     const user = jwt.verify(token, process.env.JWT_KEY);
-    const userId = user.id;
-    const usertype = user.type;
-
-    console.log(`Decoded JWT: userId = ${userId}, type=${usertype}`);
+    userId = user.id;
+    usertype = user.type;
 
     const hash = await bcrypt.hash(newPassword, 10);
 
     let query, params;
 
-    if (userType === 'seeker') {
-      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = :userId AND delete_flag = 0;';
+    if (usertype === 'seeker') {
+      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = UNHEX(:userId) AND delete_flag = 0;';
       params = { hash, userId };
     } else {
-      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = :userId AND delete_flag = 0;';
+      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = UNHEX(:userId) AND delete_flag = 0;';
       params = { hash, userId };
     }
 
-    console.log(`Executing query: ${query} with params: ${JSON.stringify(params)}`);
+    const result = await req.db.query(query, params);
 
-    await req.db.query(query, params);
-
-    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [success] | [Password successfully reset] | 1 attempt + ${userId}\n`);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success | Password successfully reset | 1 attempt + ${userId}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | [Password reset] | reset-password | [error] | [Server failure: ${err.message}] | ${userId}\n`);
+    writer.write(`${setTimestamp(newTime)} | status: 500 | source: /reset-password | error: ${err.message} | | ${userId}@${req.socket.remoteAddress}\n`);
     res.status(500).json({ success: false, error: 'Server failure' });
   }
 });
