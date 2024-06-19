@@ -119,7 +119,7 @@ app.post('/register/seeker', async (req, res) => {t
     try {
       check = await checkUser(req, email);
     } catch (err) {
-      throw({status:500, error: err, reason: 'check failed'});
+      throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists !== false) {
       throw({status: 400, error: 'failed seeker add', reason: check.reason});
@@ -183,7 +183,6 @@ app.post('/register/employer', async (req, res) => {
   } = req.body;
   writer.write(`${setTimestamp(newTime)} | | source: /register/employer | info: registration attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(
       !firstName ||
       !lastName ||
@@ -208,11 +207,11 @@ app.post('/register/employer', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
     }
+    let check;
     try {
       check = await checkUser(req, email);
-
     } catch (err) {
-      throw({status:500, error: err, reason: 'check failed'});
+      throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists !== false) {
       throw({status: 400, error: 'failed employer add', reason: check.reason});
@@ -271,14 +270,18 @@ app.post('/login/seeker', async (req, res) => {
   const {email, pass} = req.body;
   writer.write(`${setTimestamp(newTime)} | | source: /login/seeker | info: login attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(!email || !pass) {
       throw({status: 400, error: 'failed seeker login', reason: 'missing field'});
     }
     if(!validSAN(email, 255) || !validSAN(pass, 255)) {
       throw({status: 400, error: 'failed seeker login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
+    let check;
+    try {
+      check = await checkUser(req, email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
@@ -314,15 +317,19 @@ app.post('/login/employer', async (req, res) => {
   const {email, pass} = req.body;
   writer.write(`${setTimestamp(newTime)} | | source: /login/employer | info: login attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
     }
     if(!validSAN(email, 255) || !validSAN(pass, 255)) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
-    if(check.exists == false) {
+    let check;
+    try {
+      check = await checkUser(req, email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
     const users = await login(req, email, pass, 'employer');
@@ -361,7 +368,6 @@ app.use(async function verifyJwt(req, res, next) {
     }
   
     const [scheme, token] = req.headers.authorization.split(' ');
-  
     if (scheme !== 'Bearer' || token === null) {
       throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, invalid authorization scheme'});
       // res.status(400).json({error: 'Invalid authorization, invalid authorization scheme'});
@@ -469,7 +475,7 @@ app.post('/job/add', async (req, res) => {
     try {
       check = await checkAuth(req, req.user.user_id, req.user.company);
     } catch (err) {
-      throw({status:500, error: err, reason: 'authorization failed'});
+      throw({status:500, error: err.message, reason: 'authorization failed'});
     }
     if(check === false) {
       throw({status: 403, error: 'failed job add', reason: 'failed approval'});
@@ -481,7 +487,8 @@ app.post('/job/add', async (req, res) => {
       `,{
         user_id: req.user.user_id
       });
-     const job = await req.db.query(`
+      bob(`${title}, ${req.user.company}, ${city}, ${state}, ${isRemote}, ${employer.industry}, ${employer.website}, ${experienceLevel}, ${employmentType}, ${companySize}, ${salaryLow}, ${salaryHigh}, ${benefits}, ${certifications}, ${jobDescription}, ${JSON.stringify(questions)}, ${req.user.user_id}, ${newTime}, ${false}, ${null}`)
+      const job = await req.db.query(`
         INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
         VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
       `, {
@@ -497,10 +504,10 @@ app.post('/job/add', async (req, res) => {
         company_size: companySize,
         salary_low: salaryLow,
         salary_high: salaryHigh,
-        benefits: benefits,
-        certifications: certifications,
+        benefits: !benefits ? null : JSON.stringify(benefits),
+        certifications: !certifications ? null : JSON.stringify(certifications),
         job_description: jobDescription,
-        questions: questions,
+        questions: !questions ? null : JSON.stringify(questions),
         employer_id: req.user.user_id,
         date_created: newTime,
         expires: !expDate ? false : true,
@@ -514,7 +521,7 @@ app.post('/job/add', async (req, res) => {
       `,{
         user_id: req.user.user_id
       });
-      res.status(200)
+      res.status(201)
       .json({
         success: true,
         jobId: jobId.job_id
@@ -570,10 +577,11 @@ app.post('/resume/add', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed resume add', reason: 'invalid input'});
     }
+    let check;
     try {
       check = await checkUser(req, req.user.email);
     } catch (err) {
-      throw({status:500, error: err, reason: 'check failed'});
+      throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists === false) {
       throw({status: 400, error: 'failed resume add', reason: check.reason});
@@ -786,10 +794,289 @@ app.post('/resume/add', async (req, res) => {
   }
 });
 
+app.get('/resume', async (req, res) => {
+  console.log('Get attempt: resume');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /resume | info: get attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  try{
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 400, error: 'failed resume add', reason: check.reason});
+    }
+    try {
+      const [[seeker]] = await req.db.query(`
+        SELECT first_name, last_name, email, summary
+        FROM Seeker
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });
+      const [education] = await req.db.query(`
+        SELECT institution_name, education_level, education_field, date_start, date_end, present
+        FROM Education
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });const [experience] = await req.db.query(`
+        SELECT job_title, company_name, address, city, state, date_start, date_end,  present, remote, job_description
+        FROM Experience
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });
+      const [skill] = await req.db.query(`
+        SELECT skill_name, skill_years
+        FROM Skill
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });
+      const [link] = await req.db.query(`
+        SELECT link_name, link_url
+        FROM Url
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });
+      const [publication] = await req.db.query(`
+        SELECT publication_name, publication_url, publication_date, publication_summary
+        FROM Publication
+        WHERE seeker_id = UNHEX(:user_id);
+        `, {
+          user_id: req.user.user_id,
+      });
+      const response = {success: true};
+      response.seeker = seeker;
+      response.education = !education.length ? null : education;
+      response.experience = !experience.length ? null : experience;
+      response.skill = !skill.length ? null : skill;
+      response.link = !link.length ? null : link;
+      response.publication = !publication.length ? null : publication;
+      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
+      res.status(200).json(response)
+    } catch (err) {
+      console.warn(err);
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+app.post('/job/apply/:job_id', async (req, res) => {
+  console.log('add attempt: application');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const {answers} = req.body;
+  const job_id = parseInt(req.params.job_id);
+  try{
+    if(!job_id) {
+      throw({status: 400, error: 'failed application add', reason: 'missing field'});
+    }
+    if(!validN(job_id) || !validJSON(answers)) {
+      throw({status: 400, error: 'failed application add', reason: 'invalid input'});
+    }
+    let questions;
+    try {
+      [[{questions}]] = await req.db.query(`
+        SELECT questions
+        FROM job
+        WHERE job_id = :job_id;
+        `,{
+          job_id: job_id,
+      });
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+    //questions = questions.questions;
+    if(!questions && answers) {
+      throw({status: 400, error: 'failed application add', reason: 'answers with no questions'});
+    }
+    if(questions !== null){
+      if(!answers || Object.keys(answers).length < Object.keys(questions).length) throw({status: 400, error: 'failed application add', reason: 'unanswered questions'});
+      if(Object.keys(answers).length > Object.keys(questions).length) throw({status: 400, error: 'failed application add', reason: 'too many answers'});
+    }
+    let repeat;
+    try {
+      [[repeat]] = await req.db.query(`
+        SELECT CASE
+        WHEN EXISTS (
+          SELECT 1 FROM Application
+          WHERE (job_id = :job_id AND seeker_id = UNHEX(:seeker_id))
+        )
+        THEN (
+          SELECT job_id FROM Application
+          WHERE (job_id = :job_id AND seeker_id = UNHEX(:seeker_id))
+        )
+        ELSE NULL
+        END AS job_id
+        FROM Application;
+      `,{
+        job_id: job_id,
+        seeker_id: req.user.user_id,
+      });
+      repeat = !repeat.job_id ? false : true;
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+    if(repeat) {
+      throw({status: 400, error: 'failed application add', reason: 'already applied'});
+    }
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 400, error: 'failed application add', reason: check.reason});
+    }
+    try {
+      await req.db.query(`
+        INSERT INTO Application(seeker_id, job_id, answers)
+        VALUE(UNHEX(:seeker_id), :job_id, :answers);
+      `, {
+        seeker_id: req.user.user_id,
+        job_id: job_id,
+        answers: !answers ? null : JSON.stringify(answers),
+      })
+      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/apply | success: application added | | @${req.socket.remoteAddress}\n`);
+      res.status(201).json({success: true, message: 'application submitted'})
+    } catch (err) {
+      console.warn(err);
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+app.get('/job/applied', async (req, res) => {
+  console.log('Get attempt: jobs applied');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /job/applied | info: get attempt: jobs applied | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  try{
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 400, error: 'failed jobs applied get', reason: check.reason});
+    }
+    try {
+      const [apps] = await req.db.query(`
+        SELECT title, date_applied, questions, answers
+        FROM Application INNER JOIN Job
+        ON Job.job_id = Application.job_id
+        WHERE (Application.seeker_id = UNHEX(:user_id) AND Job.delete_flag = 0)
+        ORDER BY date_applied DESC;
+      `, {
+        user_id: req.user.user_id,
+      });
+      console.log(apps)
+      const response = {success: true};
+      response.apps = apps;
+      //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applied | success: get attempt: jobs applied | | @${req.socket.remoteAddress}\n`);
+      res.status(200).json(response)
+    } catch (err) {
+      console.warn(err);
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applied | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/applied | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+app.get('/job/applications', async (req, res) => {
+  console.log('Get attempt: applications');
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /job/applications | info: get attempt: applications | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  try{
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 400, error: 'failed application get', reason: check.reason});
+    }
+    let auth;
+    try {
+      auth = await checkAuth(req, req.user.user_id, req.user.company);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'authorization failed'});
+    }
+    if(auth === false) {
+      throw({status: 403, error: 'failed application get', reason: 'failed approval'});
+    }
+    try {
+      const [apps] = await req.db.query(`
+        SELECT HEX(Seeker.seeker_id) AS user_id, Job.job_id, title, first_name, last_name, accepted, rejected
+        FROM Application INNER JOIN (Seeker, Job)
+        ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
+        WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0)
+        ORDER BY date_applied DESC;
+      `, {
+        company: req.user.company,
+      });
+      console.log(apps)
+      const response = {success: true};
+      response.apps = apps;
+      //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
+      res.status(200).json(response)
+    } catch (err) {
+      console.warn(err);
+      throw({status:500, error: err.message, reason: 'MySQL error'});
+    }
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/applications | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
 // from here
 
 app.listen(port, () => {
   console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
   console.log('test log')
-  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`);
+  writer.write(`${setTimestamp(time)} | | source: server | info: server started | | port: ${port}\n`);
 });

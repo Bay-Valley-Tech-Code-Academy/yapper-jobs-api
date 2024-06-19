@@ -36,9 +36,9 @@ CREATE TABLE Job (
 	job_description TEXT NOT NULL,
 	questions JSON,
 	delete_flag BOOLEAN NOT NULL DEFAULT 0,
-	date_created datetime,
-	expires boolean,
-    date_expires datetime,
+	date_created DATETIME,
+	expires BOOLEAN,
+    date_expires DATETIME,
 	employer_id BINARY(16),
 	PRIMARY KEY (job_id),
 	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
@@ -56,6 +56,8 @@ CREATE TABLE Seeker (
 	link_entries TINYINT NOT NULL DEFAULT 0,
 	publication_entries TINYINT NOT NULL DEFAULT 0,
 	summary TEXT(640),
+    resume_uploaded BOOLEAN DEFAULT FALSE,
+    resume_url TEXT(2080) DEFAULT NULL,
 	delete_flag BOOLEAN NOT NULL DEFAULT 0
 );
 
@@ -95,7 +97,7 @@ CREATE TABLE Skill (
 CREATE TABLE Url (
 	seeker_id BINARY(16) NOT NULL,
 	link_name TINYTEXT NOT NULL,
-	link_url text(2080) NOT NULL,
+	link_url TEXT(2080) NOT NULL,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id)
 );
 
@@ -112,6 +114,9 @@ CREATE TABLE Application (
 	seeker_id BINARY(16) NOT NULL,
 	job_id INT UNSIGNED NOT NULL,
 	answers JSON,
+	date_applied DATETIME DEFAULT CURRENT_TIMESTAMP,
+    approved BOOLEAN DEFAULT FALSE,
+    rejected BOOLEAN DEFAULT FALSE,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id),
 	FOREIGN KEY (job_id) REFERENCES Job(job_id)
 );
