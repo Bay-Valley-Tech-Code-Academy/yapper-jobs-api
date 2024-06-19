@@ -202,6 +202,46 @@
       error: <String>
     }
 
+## Endpoint: /forgot-password
+Expects: 
+
+    {
+      "email": <String>
+    }
+
+Responses: 
+
+    {
+      "success": true,
+      "message": "Reset link sent to email",
+      "token": <String>
+    }
+
+    {
+      "success": false,
+      "error": "Server failure"
+    }
+
+## Endpoint: /reset-password:
+Expects:
+
+    {
+      "newPassword": <String>,
+      "token": <String>
+    }
+
+Responses: 
+
+    {
+      "success": true,
+      "message": "Password reset successful"
+    }
+
+    {
+      "success": false,
+      "error": "Server failure"
+    }
+  
 # API Examples
   ## Multiple Entries for Endpoint: /resume/add
     "education": {
