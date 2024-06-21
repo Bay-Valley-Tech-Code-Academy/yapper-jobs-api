@@ -67,9 +67,9 @@ module.exports = {
     try {
       const [[check]] = await req.db.query(`
       SELECT CASE 
-        WHEN EXISTS(SELECT 1 FROM Employer WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Employer WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Employer WHERE (email = :email AND delete_flag = 0))
-        WHEN EXISTS(SELECT 1 FROM Seeker WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Seeker WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Seeker WHERE (email = :email AND delete_flag = 0))
         ELSE NULL
       END AS checked,
@@ -90,7 +90,6 @@ module.exports = {
       `,{
         email: email
       });
-
       switch (check.checked) {// query return logic
         case 0:
           return {exists: true, reason: 'email already registered', usertype: check.usertype, userId: check.user_id};

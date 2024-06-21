@@ -487,7 +487,6 @@ app.post('/job/add', async (req, res) => {
       `,{
         user_id: req.user.user_id
       });
-      bob(`${title}, ${req.user.company}, ${city}, ${state}, ${isRemote}, ${employer.industry}, ${employer.website}, ${experienceLevel}, ${employmentType}, ${companySize}, ${salaryLow}, ${salaryHigh}, ${benefits}, ${certifications}, ${jobDescription}, ${JSON.stringify(questions)}, ${req.user.user_id}, ${newTime}, ${false}, ${null}`)
       const job = await req.db.query(`
         INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
         VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
@@ -876,7 +875,7 @@ app.get('/resume', async (req, res) => {
   }
 });
 
-app.post('/job/apply/:job_id', async (req, res) => {
+app.post('/job/apply/:job_id/submit', async (req, res) => {
   console.log('add attempt: application');
   const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1047,7 +1046,8 @@ app.get('/job/applications', async (req, res) => {
         FROM Application INNER JOIN (Seeker, Job)
         ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
         WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0)
-        ORDER BY date_applied DESC;
+        ORDER BY date_applied DESC
+        LIMIT 2500;
       `, {
         company: req.user.company,
       });
@@ -1073,11 +1073,11 @@ app.get('/job/applications', async (req, res) => {
   }
 });
 
-app.get('/job/applications/resume?email=:email', async (req, res) => {
-  console.log('Get attempt: applied resume');
+app.get('/job/applications/resume', async (req, res) => {
+  console.log('Get attempt: applicant resume');
   const newTime = new Date(Date.now());// for logging
-  const resumeEmail = req.params.email;
-  writer.write(`${setTimestamp(newTime)} | | source: /job/applications/resume | info: get attempt: applied resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const resumeEmail = req.query.email;
+  writer.write(`${setTimestamp(newTime)} | | source: /job/applications/resume | info: get attempt: applicant resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
     let check;
     try {
@@ -1086,7 +1086,7 @@ app.get('/job/applications/resume?email=:email', async (req, res) => {
       throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists === false) {
-      throw({status: 400, error: 'failed applied resume get', reason: check.reason});
+      throw({status: 400, error: 'failed applicant resume get', reason: check.reason});
     }
     let auth;
     try {
@@ -1095,49 +1095,99 @@ app.get('/job/applications/resume?email=:email', async (req, res) => {
       throw({status:500, error: err.message, reason: 'authorization failed'});
     }
     if(auth === false) {
-      throw({status: 403, error: 'failed applied resume get', reason: 'failed approval'});
+      throw({status: 403, error: 'failed applicant resume get', reason: 'failed approval'});
     }
-    let seeker;
+    let applicant;
     try {
-      seeker = await checkUser(req, req.user.email);
+      applicant = await checkUser(req, resumeEmail);
     } catch (err) {
-      throw({status:500, error: err.message, reason: 'failed to find job seeker'});
+      throw({status:500, error: err.message, reason: 'failed to find applicant'});
     }
-    if(seeker.exists === false) {
-      throw({status: 400, error: 'failed applied resume get', reason: seeker.reason});
+    if(applicant.exists === false) {
+      throw({status: 400, error: 'failed applicant resume get', reason: seeker.reason});
     }
     try {
-      const [apps] = await req.db.query(`
+      const [[{resume_uploaded}]] = await req.db.query(`
         SELECT CASE
           WHEN EXISTS(SELECT 1
             FROM Application INNER JOIN (Seeker, Job)
-                ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
-                WHERE (Resume_uploaded = 1 AND Application.seeker_id = UNHEX(:seeker_id) AND Job.company = :company))
-          THEN(SELECT resume_url
-            FROM Seeker INNER JOIN Application
-                ON Seeker.seeker_id = Application.seeker_id
-                WHERE Application.seeker_id = UNHEX(:seeker_id))
-          ELSE NULL
-        END AS resume_url,
-        CASE
-          WHEN EXISTS(SELECT 1
-            FROM Application INNER JOIN (Seeker, Job)
-                ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
-                WHERE (application.seeker_id = UNHEX(:seeker_id) AND Job.company = :company))
+            ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
+            WHERE (Application.seeker_id = UNHEX(:seeker_id) AND Job.company = :company))
           THEN(SELECT resume_uploaded
             FROM Seeker
-                WHERE seeker_id = UNHEX(:seeker_id))
+            WHERE seeker_id = UNHEX(:seeker_id))
           ELSE NULL
         END AS resume_uploaded;
       `, {
         company: req.user.company,
-        seeker_id: seeker.userId,
+        seeker_id: applicant.userId,
       });
-      console.log(apps)
-      const response = {success: true};
-      response.apps = apps;
-      //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
-      res.status(200).json(response)
+      const resume = {};
+      if(resume_uploaded === 0) {
+        const [[seeker]] = await req.db.query(`
+          SELECT first_name, last_name, email, summary
+          FROM Seeker
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });
+        const [education] = await req.db.query(`
+          SELECT institution_name, education_level, education_field, date_start, date_end, present
+          FROM Education
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });const [experience] = await req.db.query(`
+          SELECT job_title, company_name, address, city, state, date_start, date_end,  present, remote, job_description
+          FROM Experience
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });
+        const [skill] = await req.db.query(`
+          SELECT skill_name, skill_years
+          FROM Skill
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });
+        const [link] = await req.db.query(`
+          SELECT link_name, link_url
+          FROM Url
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });
+        const [publication] = await req.db.query(`
+          SELECT publication_name, publication_url, publication_date, publication_summary
+          FROM Publication
+          WHERE seeker_id = UNHEX(:user_id);
+          `, {
+            user_id: applicant.userId,
+        });
+        resume.success = true;
+        resume.seeker = seeker;
+        resume.education = !education.length ? null : education;
+        resume.experience = !experience.length ? null : experience;
+        resume.skill = !skill.length ? null : skill;
+        resume.link = !link.length ? null : link;
+        resume.publication = !publication.length ? null : publication;
+      } else if(resume_uploaded === 1) {
+        const [[{resume_url}]] = await req.db.query(`
+          SELECT resume_url
+          FROM Seeker INNER JOIN Application
+          ON Seeker.seeker_id = Application.seeker_id
+          WHERE Application.seeker_id = UNHEX(:seeker_id);
+          `,{
+            seeker_id: applicant.userId,
+        });
+        resume.success = true;
+        resume.resume_url = resume_url
+      } else {
+        throw({message: "null where field set to default false"})
+      }
+      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
+      res.status(200).json(resume)
     } catch (err) {
       console.warn(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
@@ -1146,7 +1196,7 @@ app.get('/job/applications/resume?email=:email', async (req, res) => {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: //job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
