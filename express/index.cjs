@@ -8,6 +8,7 @@ const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
 const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
 const { title } = require('process');
+const { error } = require('console');
 require('dotenv').config();
 
 const corsOptions = {
@@ -354,6 +355,58 @@ app.post('/login/employer', async (req, res) => {
     }
   }
 });
+
+app.get('/job/:job_id/get', async (req, res) => {
+  const job_id = parseInt(req.params.job_id);
+  console.log('get attempt: job');
+  const newTime = new Date(Date.now());
+  writer.write(`${setTimestamp(newTime)} | | source: /job/${job_id}/get | info: get attempt: job | | attempt: @${req.socket.remoteAddress}\n`);
+  try{
+    const [[{exist}]] = await req.db.query(`
+      SELECT CASE
+        WHEN EXISTS(
+          SELECT 1
+          FROM Job
+          WHERE (job_id = :job_id))
+        THEN(
+          SELECT delete_flag
+          FROM Job
+          WHERE job_id = :job_id)
+        ELSE NULL
+      END AS exist;
+    `,{
+      job_id: job_id,
+    });
+    switch(exist) {
+      case 0:
+        break;
+      case 1:
+      case null:
+        throw({status: 404, error: 'failed job get', reason: 'job not found'});
+      default:
+        throw({status: 500, error: 'failed job get', reason: 'search defaulted'});
+    }
+    const [[job]] = await req.db.query(`
+      SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      FROM Job
+      WHERE job_id = :job_id;
+    `,{
+      job_id: job_id,
+    });
+    res.status(200).json({success: true, job: job});
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/${job_id}/get | success: got job ${job_id} | | @${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/${job_id}/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
+    }
+  }
+})
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {

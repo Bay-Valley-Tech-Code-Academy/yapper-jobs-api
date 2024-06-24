@@ -109,7 +109,7 @@
       isRemote: <boolean>,
       experienceLevel: <String || null>,
       employmentType: <String>,
-      companySize: <number || null>,
+      companySize: <String>,
       salaryLow: <number || null>,
       salaryHigh: <number || null>,
       benefits: <JSON{Strings} || null>,
