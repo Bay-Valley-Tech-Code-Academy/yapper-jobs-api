@@ -6,15 +6,19 @@
   `<JSON>` expect no nesting unless otherwise (noted)
 
 ## Endpoint: post /register/seeker
-  ### Params: none
-  ### Expects:
-    {
-      firstName: <String>,
-      lastName: <String>,
-      pass: <String>,
-      email: <String>
-    }
-  ### Responses:
+   Params: none
+
+   Expects:
+
+      {
+        firstName: <String>,
+        lastName: <String>,
+        pass: <String>,
+        email: <String>
+      }
+
+   Responses:
+
     {
       success: true,
       firstName: <String>,
@@ -29,8 +33,10 @@
     }
 
 ## Endpoint: post /register/employer
-  ### Params: none
-  ### Expects:
+   Params: none
+
+   Expects:
+
     {
       firstName: <String>,
       lastName: <String>,
@@ -41,7 +47,9 @@
       website: <String(2047)>,
       industry: <String>
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       firstName: <String>,
@@ -57,13 +65,17 @@
     }
 
 ## Endpoint: post /login/seeker
-  ### Params: none
-  ### Expects:
+   Params: none
+
+   Expects:
+
     {
       email: <String>,
       pass: <String>
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       firstName: <String>,
@@ -78,13 +90,17 @@
     }
 
 ## Endpoint: post /login/employer
-  ### Params: none
-  ### Expects:
+   Params: none
+
+   Expects:
+
     {
       email: <String>,
       pass: <String>
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       firstName: <String>,
@@ -100,9 +116,12 @@
     }
 
 ## Endpoint: post /job/:job_id/get
-  ### Params: :job_id
-  ### Expects: none
-  ### Responses:
+   Params: :job_id
+
+   Expects: none
+
+   Responses:
+
     {
       success: true,
       job: {
@@ -134,8 +153,10 @@
     }
 
 ## Endpoint: post /job/add
-  ### Params: none
-  ### Expects:
+   Params: none
+
+   Expects:
+
     {
       title: <String>,
       city: <String>,
@@ -152,7 +173,9 @@
       questions: <JSON{Strings} || null>, //max 15
       expDate: <Date || null>
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       jobId: <number>
@@ -164,8 +187,10 @@
     }
 
 ## Endpoint: post /resume/add
-  ### Params: none
-  ### Expects:
+   Params: none
+
+   Expects:
+
     {
       summary: <String(600)>,
       education: <JSON(2): {
@@ -213,7 +238,9 @@
         }
       } || null>
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       jobId: <number>
@@ -225,9 +252,12 @@
     }
 
 ## Endpoint: get /resume
-  ### Params: none
-  ### Expects: none
-  ### Responses:
+   Params: none
+
+   Expects: none
+
+   Responses:
+
     {
       success: true,
       seeker: <JSON{
@@ -249,12 +279,16 @@
     }
 
 ## Endpoint: post /job/apply/:job_id/submit
-  ### Params: :job_id
-  ### Expects:
+   Params: :job_id
+
+   Expects:
+
     {
       answers: <JSON{Strings} || null>  //max 15
     }
-  ### Responses:
+
+   Responses:
+
     {
       success: true,
       message: 'application submitted'
@@ -266,9 +300,12 @@
     }
 
 ## Endpoint: get /job/applied
-  ### Params: none
-  ### Expects: none
-  ### Responses:
+   Params: none
+
+   Expects: none
+
+   Responses:
+
     {
       success: true,
       title: <String>,
@@ -283,9 +320,12 @@
     }
 
 ## Endpoint: get /job/applications
-  ### Params: none
-  ### Expects: none
-  ### Responses:
+   Params: none
+
+   Expects: none
+
+   Responses:
+
     {
       success: true,
       apps: <JSON array(2500)>
@@ -297,9 +337,12 @@
     }
 
 ## Endpoint: get /job/applications/resume
-  ### Query: email: seeker email
-  ### Expects: none
-  ### Responses:
+   Query: email: seeker email
+
+   Expects: none
+
+   Responses:
+
     {
       success: true,
       resume_url: <String(2048)>
@@ -327,6 +370,7 @@
 
 # API Examples
   ## Multiple Entries for Endpoint: /resume/add
+  
     "education": {
         "1": {
             "institutionName": "Example Community College",
@@ -348,6 +392,7 @@
 
 # JWT
   ## Login JWT contents
+
     {
       user_id: <String>,
       email: <String>,
@@ -358,11 +403,15 @@
 
 # Log
   ## Format
+
     <timestamp> | [status] | <source> | [success || error || info] | [reason] | <attempt + ip || ip>\n
+
   status should only be used when logging response to request.
   
   reason should only be used if an error occurs.
 
   ## Examples
+
     writer.write(`${setTimestamp(newTime)} | status: 400 | source: /login/seeker | error: "Login failed" | reason: "User not found" | attempt: ${email}@${req.socket.remoteAddress}\n`);
+
     writer.write(`${setTimestamp(time)} | | source: server | info: server started | | port: ${port}\n`);

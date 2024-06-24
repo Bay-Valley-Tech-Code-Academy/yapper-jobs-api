@@ -356,6 +356,7 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
+// get job details
 app.get('/job/:job_id/get', async (req, res) => {
   const job_id = parseInt(req.params.job_id);
   console.log('get attempt: job');
