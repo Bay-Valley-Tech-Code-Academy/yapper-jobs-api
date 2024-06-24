@@ -99,6 +99,40 @@
       error: <String>
     }
 
+## Endpoint: post /job/:job_id/get
+  ### Params: :job_id
+  ### Expects: none
+  ### Responses:
+    {
+      success: true,
+      job: {
+        title:  <String>,
+        company:  <String>,
+        city:  <String>,
+        state:  <String>,
+        is_remote: <boolean>,
+        industry:  <String>,
+        website:  <String>,
+        experience_level:  <String>,
+        employment_type:  <String>,
+        company_size:  <String>,
+        salary_low: <number>,
+        salary_high: <number>,
+        benefits: <JSON || null>,
+        certifications: <JSON || null>,
+        job_description:  <String>,
+        questions: <JSON || null>,
+        date_created: <Date>,
+        expires: <boolean>,
+        date_expires: <Date || null>
+      }
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
 ## Endpoint: post /job/add
   ### Params: none
   ### Expects:
