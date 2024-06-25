@@ -5,10 +5,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const { rateLimit } = require('express-rate-limit')
+const { rateLimit } = require('express-rate-limit');
 const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
 const { title } = require('process');
-const { error } = require('console');
+const { application } = require('express');
 require('dotenv').config();
 
 const corsOptions = {
@@ -70,6 +70,7 @@ const resumeLimiter = rateLimit({
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
+
 
 app.use(cors(corsOptions));
 
@@ -356,6 +357,39 @@ app.post('/login/employer', async (req, res) => {
   }
 });
 
+// job search
+app.get('/job/search/get', async (req, res) => {
+  console.log('get attempt: jobs');
+  const newTime = new Date(Date.now());
+  bob(req.query)
+  bob(7)
+  const start_index = parseInt(req.query.startIndex);
+  const per_page = parseInt(req.query.perPage);
+  writer.write(`${setTimestamp(newTime)} | | source: /job/search/get | info: get attempt: jobs | | attempt: @${req.socket.remoteAddress}\n`);
+  try {
+    let [[jobs]] = await req.db.query(`
+      SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      FROM Job
+      WHERE job_id >= :start_index
+      LIMIT :per_page;
+    `,{
+      start_index: start_index,
+      per_page: per_page,
+    });
+    res.status(200)
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/search/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/search/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
 // get job details
 app.get('/job/:job_id/get', async (req, res) => {
   const job_id = parseInt(req.params.job_id);
@@ -407,7 +441,9 @@ app.get('/job/:job_id/get', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
-})
+});
+
+
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
@@ -934,7 +970,9 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
   const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {answers} = req.body;
+  bob(req.params)
   const job_id = parseInt(req.params.job_id);
+  bob(job_id)
   try{
     if(!job_id) {
       throw({status: 400, error: 'failed application add', reason: 'missing field'});
@@ -1041,7 +1079,7 @@ app.get('/job/applied', async (req, res) => {
     }
     try {
       const [apps] = await req.db.query(`
-        SELECT title, date_applied, questions, answers
+        SELECT title, date_applied, questions, answers, seen, accepted, rejected
         FROM Application INNER JOIN Job
         ON Job.job_id = Application.job_id
         WHERE (Application.seeker_id = UNHEX(:user_id) AND Job.delete_flag = 0)
@@ -1075,7 +1113,12 @@ app.get('/job/applications', async (req, res) => {
   console.log('Get attempt: applications');
   const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | | source: /job/applications | info: get attempt: applications | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const start_index = parseInt(req.query.startIndex);
+  const per_page = parseInt(req.query.perPage);
   try{
+    if(!validN(start_index) || !validN(per_page)) {
+      throw({status:400, error: 'failed applications get', reason: 'invalid query'});
+    }
     let check;
     try {
       check = await checkUser(req, req.user.email);
@@ -1096,14 +1139,16 @@ app.get('/job/applications', async (req, res) => {
     }
     try {
       const [apps] = await req.db.query(`
-        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, title, first_name, last_name, accepted, rejected
+        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, app_index, title, first_name, last_name, seen, accepted, rejected
         FROM Application INNER JOIN (Seeker, Job)
         ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
-        WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0)
+        WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0 AND app_index > :start_index)
         ORDER BY date_applied DESC
-        LIMIT 2500;
+        LIMIT :per_page;
       `, {
         company: req.user.company,
+        start_index: start_index,
+        per_page: per_page,
       });
       console.log(apps)
       const response = {success: true};
@@ -1131,8 +1176,12 @@ app.get('/job/applications/resume', async (req, res) => {
   console.log('Get attempt: applicant resume');
   const newTime = new Date(Date.now());// for logging
   const resumeEmail = req.query.email;
+  const app_index = parseInt(req.query.appIndex);
   writer.write(`${setTimestamp(newTime)} | | source: /job/applications/resume | info: get attempt: applicant resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
+    if(!validSAN(resumeEmail) || !validN(app_index)) {
+      throw({status:400, error: 'failed applicant resume get', reason: 'invalid query'});
+    }
     let check;
     try {
       check = await checkUser(req, req.user.email);
@@ -1240,6 +1289,13 @@ app.get('/job/applications/resume', async (req, res) => {
       } else {
         throw({message: "null where field set to default false"})
       }
+      await req.db.query(`
+        UPDATE Application
+        SET Seen = 1
+        WHERE app_index = :app_index;
+      `,{
+        app_index: app_index,
+      })
       writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(resume)
     } catch (err) {

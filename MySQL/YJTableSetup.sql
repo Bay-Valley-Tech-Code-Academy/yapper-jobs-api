@@ -113,9 +113,11 @@ CREATE TABLE Publication (
 CREATE TABLE Application (
 	seeker_id BINARY(16) NOT NULL,
 	job_id INT UNSIGNED NOT NULL,
+    app_index INT UNSIGNED AUTO_INCREMENT UNIQUE KEY,
 	answers JSON,
 	date_applied DATETIME DEFAULT CURRENT_TIMESTAMP,
-    approved BOOLEAN DEFAULT FALSE,
+    seen BOOLEAN DEFAULT FALSE,
+    accepted BOOLEAN DEFAULT FALSE,
     rejected BOOLEAN DEFAULT FALSE,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id),
 	FOREIGN KEY (job_id) REFERENCES Job(job_id)
@@ -137,6 +139,9 @@ VALUE(UNHEX('00000000000000000000000000000000'), "example", "example", "elpmaxe"
 
 INSERT INTO Job (title, company, city, state, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, job_id)
 VALUE('example', 'example', 'example', 'EX', 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'), 12357);
+
+INSERT INTO Application (seeker_id, job_id, answers)
+VALUE(UNHEX('00000000000000000000000000000001'), 1, null);
 
 # how to read plaintext uuid:
 # SELECT HEX(<column>) FROM <table>;
