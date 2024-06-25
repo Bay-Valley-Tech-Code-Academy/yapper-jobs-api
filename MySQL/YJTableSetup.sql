@@ -10,7 +10,7 @@ CREATE TABLE Employer (
 	email VARCHAR(255) NOT NULL,
 	mobile VARCHAR(18) NOT NULL,
 	company VARCHAR(255) NOT NULL,
-	website VARCHAR(255) NOT NULL,
+	website TEXT NOT NULL,
 	industry VARCHAR(32) NOT NULL,
 	approver BOOLEAN NOT NULL DEFAULT 0,
 	approve_flag BOOLEAN NOT NULL DEFAULT 0,
@@ -25,7 +25,7 @@ CREATE TABLE Job (
 	state VARCHAR(2),
     is_remote BOOLEAN NOT NULL DEFAULT 0,
 	industry VARCHAR(255),
-	website VARCHAR(255),
+	website TEXT,
 	experience_level VARCHAR(255),
 	employment_type VARCHAR(255) NOT NULL,
 	company_size VARCHAR(255),
@@ -59,9 +59,9 @@ CREATE TABLE Seeker (
 
 CREATE TABLE Education (
 	seeker_id BINARY(16) NOT NULL,
-	institution_name VARCHAR(255) NOT NULL,
-	education_level VARCHAR(255) NOT NULL,
-	education_field VARCHAR(255) NOT NULL,
+	institution_name TINYTEXT NOT NULL,
+	education_level TINYTEXT NOT NULL,
+	education_field TINYTEXT NOT NULL,
 	date_start DATE NOT NULL,
 	date_end DATE,
 	present BOOLEAN NOT NULL,
@@ -73,13 +73,13 @@ CREATE TABLE Experience (
 	job_title TINYTEXT NOT NULL,
 	company_name TINYTEXT NOT NULL,
 	remote BOOLEAN NOT NULL,
-	address_street TINYTEXT,
-	address_city TINYTEXT NOT NULL,
-	address_country TINYTEXT NOT NULL,
+	address TINYTEXT,
+	city TINYTEXT NOT NULL,
+	state TINYTEXT NOT NULL,
 	date_start DATE NOT NULL,
 	date_end DATE,
 	present BOOLEAN NOT NULL,
-	description TEXT(640),
+	job_description TEXT(640),
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id)
 );
 
@@ -100,7 +100,7 @@ CREATE TABLE Url (
 CREATE TABLE Publication (
 	seeker_id BINARY(16) NOT NULL,
 	publication_name TINYTEXT NOT NULL,
-	publication_url VARCHAR(2080) NOT NULL,
+	publication_url TEXT(2080) NOT NULL,
 	publication_date DATE NOT NULL,
 	publication_summary TEXT(640) NOT NULL,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id)
