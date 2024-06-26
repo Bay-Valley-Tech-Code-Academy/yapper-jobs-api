@@ -1043,6 +1043,7 @@ app.get('/resume', async (req, res) => {
   }
 });
 
+
 app.post('/job/apply/:job_id/submit', async (req, res) => {
   console.log('add attempt: application');
   const newTime = new Date(Date.now());// for logging
@@ -1403,6 +1404,37 @@ app.get("/seeker", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to get seeker" });
+  }
+});
+//fetch user from employer table
+app.get("/employer", async (req, res) => {
+  const employer_id = req.user.user_id;
+  const email = req.user.email;
+
+  if (!employer_id) {
+    return res.status(400).json({ error: "Missing employer_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to get employer",
+        reason: "user not found",
+      };
+    }
+    const [employer] = await req.db.query(
+      `SELECT first_name, last_name FROM employer WHERE employer_id = UNHEX(:employer_id)`,
+      {
+        employer_id: employer_id,
+      }
+    );
+    res.status(200).json(employer[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get employer" });
   }
 });
 
