@@ -5,10 +5,11 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const { rateLimit } = require('express-rate-limit');
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
+<<<<<<<<< Temporary merge branch 1
+const { rateLimit } = require('express-rate-limit')
+const { fetchAndSaveJobs } = require('./jobDataHandler');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validA, validN, validState, validJSON} = require('./helper.js');
 const { title } = require('process');
-const { error } = require('console');
 require('dotenv').config();
 const { fetchAndSaveJobs } = require('./jobDataHandler.js');
 
@@ -25,10 +26,18 @@ const corsOptions = {
   origin: "*",
   credentials: true,
   optionSuccessStatus: 200,
-};
+}
+=========
+const { rateLimit } = require('express-rate-limit');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
+const { title } = require('process');
+require('dotenv').config();
+
+
+>>>>>>>>> Temporary merge branch 2
 
 const time = new Date(Date.now());// used to log server start
-const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
+const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
 const port = process.env.PORT || 3000; // default port
@@ -65,20 +74,6 @@ const registerLimiter = rateLimit({
   }
 });
 
-const resumeLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  limit: 2,
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (req, res, next) => {
-    const newTime = new Date(Date.now());// for logging
-    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /resume | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
-    res.status(429).json({success: false, error: 'Too Many Requests'});
-  }
-});
-
-app.use(cors(corsOptions));
-
 app.use(bodyParser.json());
 
 // Setup connection to MySQL server
@@ -114,10 +109,10 @@ app.post('/register/seeker', async (req, res) => {t
   writer.write(`${setTimestamp(newTime)} | | source: /register/seeker | info: Registration attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     // check if input exists and is safe
-    if(firstName == null || lastName == null || pass == null || email == null) {
+    if(!firstName || !lastName || !pass || !email) {
       throw({status: 400, error: 'failed seeker add', reason: 'missing field'});
     }
-    if(!validSAN(firstName) || !validSAN(lastName) || !validSAN(pass) || !validSAN(email)) {
+    if(!validA(firstName) || !validA(lastName) || !validSAN(pass) || !validSAN(email)) {
       throw({status: 400, error: 'failed seeker add', reason: 'invalid input'});
     }
     // check if user or email already exists
@@ -209,14 +204,14 @@ app.post("/register/employer", async (req, res) => {
       };
     }
     if(
-      !validSA(firstName, 255)  ||
-      !validSA(lastName, 255)   ||
-      !validSAN(pass, 255)      ||
-      !validSAN(email, 255)     ||
-      !validSAN(mobile, 15)     ||
-      !validSAN(company, 255)   ||
-      !validSAN(website, 2047)  ||
-      !validA(industry, 255)
+      !validA(firstName) ||
+      !validA(lastName) ||
+      !validSAN(pass) ||
+      !validSAN(email) ||
+      !validSAN(mobile) ||
+      !validSAN(company) ||
+      !validSAN(website) ||
+      !validA(industry)
     ) {
       throw {
         status: 400,
@@ -227,6 +222,7 @@ app.post("/register/employer", async (req, res) => {
     let check;
     try {
       check = await checkUser(req, email);
+
     } catch (err) {
       throw({status:500, error: err.message, reason: 'check failed'});
     }
@@ -250,7 +246,7 @@ app.post("/register/employer", async (req, res) => {
           industry: industry
         });
         const users = await login(req, email, pass, 'employer');
-        
+        console.log(user)
         res.status(200)
         .json({
           success: true,
@@ -260,7 +256,8 @@ app.post("/register/employer", async (req, res) => {
           company: users.company,
           jwt: users.jwt,
         });
-        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | | @${req.socket.remoteAddress}\n`);
+        console.log('USER', user);
+        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({ success: false, error: "server failure" });
         console.warn(err);
@@ -274,7 +271,7 @@ app.post("/register/employer", async (req, res) => {
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -405,132 +402,99 @@ app.get("/api/jobs", async (req, res) => {
     const [jobs] = await req.db.query("SELECT * FROM job");
     res.status(200).json({ success: true, data: jobs });
   } catch (err) {
-    console.error("Error fetching jobs:", err);
-    res.status(500).json({ success: false, error: "Failed to fetch jobs" });
+    console.error('Error fetching jobs:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
   }
 });
-// get job details
-app.get('/job/:job_id/get', async (req, res) => {
-  const job_id = parseInt(req.params.job_id);
-  console.log('get attempt: job');
-  const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | | source: /job/${job_id}/get | info: get attempt: job | | attempt: @${req.socket.remoteAddress}\n`);
-  try{
-    const [[{exist}]] = await req.db.query(`
-      SELECT CASE
-        WHEN EXISTS(
-          SELECT 1
-          FROM Job
-          WHERE (job_id = :job_id))
-        THEN(
-          SELECT delete_flag
-          FROM Job
-          WHERE job_id = :job_id)
-        ELSE NULL
-      END AS exist;
-    `,{
-      job_id: job_id,
-    });
-    switch(exist) {
-      case 0:
-        break;
-      case 1:
-      case null:
-        throw({status: 404, error: 'failed job get', reason: 'job not found'});
-      default:
-        throw({status: 500, error: 'failed job get', reason: 'search defaulted'});
-    }
-    const [[job]] = await req.db.query(`
-      SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
-      FROM Job
-      WHERE job_id = :job_id;
-    `,{
-      job_id: job_id,
-    });
-    res.status(200).json({success: true, job: job});
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/${job_id}/get | success: got job ${job_id} | | @${req.socket.remoteAddress}\n`);
-  } catch (err) {
-    console.warn(err);
-    if(!err.reason) {
-      res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/${job_id}/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
-    }
-    else {
-      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
-    }
-  }
-})
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
   console.log('Verify attempt: JWT');
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verify attempt: JWT | | attempt: @${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime)} | verify attempt: JWT | attempt: @${req.socket.remoteAddress}\n`);
   try {
     if (!req.headers.authorization) {
-      throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, no authorization headers'});
+      throw {
+        status: 400,
+        error: "failed JWT verify",
+        reason: "invalid authorization, no authorization headers",
+      };
       // writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT\n`);
       // res.status(400).json({error: 'Invalid authorization, no authorization headers'});
     }
   
     const [scheme, token] = req.headers.authorization.split(' ');
+  
     if (scheme !== 'Bearer' || token === null) {
       throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, invalid authorization scheme'});
       // res.status(400).json({error: 'Invalid authorization, invalid authorization scheme'});
     }
-  
+
     try {
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
-      writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
+      writer.write(`${setTimestamp(newTime)} | Verified: JWT | ${req.user.email}@${req.socket.remoteAddress}\n`)
       await next();
     } catch (err) {
       console.log(err);
       if (
-        err.message && 
-        (err.message.toUpperCase() === 'INVALID TOKEN' || 
-        err.message.toUpperCase() === 'JWT EXPIRED' ||
-        err.message.toUpperCase() ==='JWT MALFORMED')
+        err.message &&
+        (err.message.toUpperCase() === "INVALID TOKEN" ||
+          err.message.toUpperCase() === "JWT EXPIRED" ||
+          err.message.toUpperCase() === "JWT MALFORMED")
       ) {
         req.status = err.status || 500;
         req.body = err.message;
-        req.app.emit('jwt-error', err, req);
-        throw({status: 400, error: 'failed JWT verify', reason: err.message});
+        req.app.emit("jwt-error", err, req);
+        throw { status: 400, error: "failed JWT verify", reason: err.message };
       } else {
-  
-        throw((err.status || 500), err.message);
+        throw (err.status || 500, err.message);
       }
     }
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: JWT | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: JWT | error: ${err} | @${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
     }
-    
   }
-  
 
+  await next();
 });
 
+/*  job_id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    company VARCHAR(255) NOT NULL,
+    city VARCHAR(255) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    zip int3 NOT NULL,
+    industry VARCHAR(255) NOT NULL,
+    experience_level VARCHAR(255) NOT NULL,
+    employment_type VARCHAR(255) NOT NULL,
+    company_size VARCHAR(255) NOT NULL,
+    salary_low INT NOT NULL,
+    salary_high INT NOT NULL,
+    benefits INT NOT NULL,
+    certifications INT NOT NULL,
+    job_description TEXT NOT NULL,
+    questions JSON,
+    delete_flag BOOLEAN NOT NULL DEFAULT 0,
+    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    employer_id BINARY(16), */
 // Add new job endpoint
 app.post('/job/add', async (req, res) => {
-  if(req.user.type != 'employer') throw({status: 403, error: 'failed job add', reason: 'forbidden'});
   console.log('Add attempt: job');
-  const newTimestamp = Math.floor(Date.now() / 1000);
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /job/add | info: add attempt: job | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime)} | add attempt: job | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   // api body MUST send null object for empty json inputs
   const {
     title,
     city,
     state,
-    isRemote,
+    zip,
     experienceLevel,
     employmentType,
     companySize,
@@ -539,41 +503,38 @@ app.post('/job/add', async (req, res) => {
     benefits,
     certifications,
     jobDescription,
-    expDate,
     questions
   } = req.body;
   try {
     // check if input exists and is safe
     if(
-      !title                  ||
-      !city                   ||
-      !state                  ||
-      isRemote === undefined  ||
-      !experienceLevel        ||
-      !employmentType         ||
-      !companySize            ||
-      !salaryLow              ||
-      !salaryHigh             ||
-      !jobDescription         ||
-      expDate === undefined
+      !title            ||
+      !city             ||
+      !state            ||
+      !zip              ||
+      !experienceLevel  ||
+      !employmentType   ||
+      !companySize      ||
+      !salaryLow        ||
+      !salaryHigh       ||
+      !jobDescription
     ) {
       throw({status: 400, error: 'failed job add', reason: 'missing field'});
     }
     if(
-      !validSAN(title, 255)           ||
-      !validA(city, 255)              ||
-      !validState(state)              ||
-      !validA(experienceLevel, 255)   ||
-      !validSAN(employmentType, 255)  ||
-      !validN(companySize)            ||
-      !validN(salaryLow)              ||
-      !validN(salaryHigh)             ||
-      !validJSON(benefits)            ||
-      !validJSON(certifications)      ||
-      !validSAN(jobDescription, 600)  ||
-      !validJSON(questions)           ||
-      !validExpDate(expDate).valid    ||
-      typeof(isRemote) !== 'boolean'
+      !validSAN(title)          ||
+      !validA(city)             ||
+      !validState(state)        ||
+      !validN(zip)              ||
+      !validA(experienceLevel)  ||
+      !validSAN(employmentType) ||
+      !validN(companySize)      ||
+      !validN(salaryLow)        ||
+      !validN(salaryHigh)       ||
+      !validJSON(benefits)      ||
+      !validJSON(certifications)||
+      !validSAN(jobDescription) ||
+      !validJSON(questions)
     ) {
       throw({status: 400, error: 'failed job add', reason: 'invalid input'});
     }
@@ -587,14 +548,13 @@ app.post('/job/add', async (req, res) => {
     if(check === false) {
       throw({status: 403, error: 'failed job add', reason: 'failed approval'});
     }
-
     try {
       const [[employer]] = await req.db.query(`
         SELECT industry, website FROM Employer WHERE employer_id = UNHEX(:user_id);
       `,{
         user_id: req.user.user_id
       });
-      const job = await req.db.query(`
+     const job = await req.db.query(`
         INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
         VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
       `, {
@@ -602,7 +562,7 @@ app.post('/job/add', async (req, res) => {
         company: req.user.company,
         city: city,
         state: state,
-        is_remote: isRemote,
+        zip: zip,
         industry: employer.industry,
         website: employer.website,
         experience_level: experienceLevel,
@@ -613,7 +573,7 @@ app.post('/job/add', async (req, res) => {
         benefits: !benefits ? null : JSON.stringify(benefits),
         certifications: !certifications ? null : JSON.stringify(certifications),
         job_description: jobDescription,
-        questions: !questions ? null : JSON.stringify(questions),
+        questions: questions,
         employer_id: req.user.user_id,
         date_created: newTime,
         expires: !expDate ? false : true,
@@ -622,7 +582,7 @@ app.post('/job/add', async (req, res) => {
       const [[jobId]] = await req.db.query(`
         SELECT job_id FROM Job 
         WHERE employer_id = UNHEX(:user_id)
-        ORDER BY date_created DESC
+        ORDER BY created DESC
         LIMIT 1;
       `,{
         user_id: req.user.user_id
@@ -632,7 +592,7 @@ app.post('/job/add', async (req, res) => {
         success: true,
         jobId: jobId.job_id
       });
-      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/add | success: ${req.user.email} @ ${req.user.company} added job id: ${jobId.job_id} | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/add | success: ${req.user.email} @ ${req.user.company} added job id: ${jobId.job_id} | @${req.socket.remoteAddress}\n`);
     } catch (err) {
       throw({status: 500, error: 'failed job add', reason: err.message})
     }
@@ -640,11 +600,11 @@ app.post('/job/add', async (req, res) => {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/add | error: ${err.message} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/add | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -653,7 +613,7 @@ app.post('/job/add', async (req, res) => {
 app.post('/resume/add', async (req, res) => {
   console.log('Add attempt: resume');
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /resume/add | info: add attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime)} | add attempt: resume | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {
     summary,
     education,
@@ -683,11 +643,10 @@ app.post('/resume/add', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed resume add', reason: 'invalid input'});
     }
-    let check;
     try {
       check = await checkUser(req, req.user.email);
     } catch (err) {
-      throw({status:500, error: err.message, reason: 'check failed'});
+      throw({status:500, error: err, reason: 'check failed'});
     }
     if(check.exists === false) {
       throw({status: 400, error: 'failed resume add', reason: check.reason});
@@ -885,13 +844,12 @@ app.post('/resume/add', async (req, res) => {
     });
     sqlStrs.push(`UPDATE Seeker\nSET summary = '${summary}', education_entries = ${entries[0]}, experience_entries = ${entries[1]}, skill_entries = ${entries[2]}, link_entries = ${entries[3]}, publication_entries = ${entries[4]}\nWHERE seeker_id = UNHEX("${req.user.user_id}");`);
     sqlStrs.every(async (entry) => await req.db.execute(entry));
-    writer.write(`${setTimestamp(newTime)} | status: 201 | source: /resume/add | success: ${req.user.email} added/updated resume | | @${req.socket.remoteAddress}\n`);
-    res.status(201).json({success: true, message: "resume info added"});
+    res.json({message: "wow"})
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume/add | error: ${err.message} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
@@ -1314,157 +1272,8 @@ app.get('/job/applications/resume', async (req, res) => {
 
 // from here
 
-
-
-//fetch user from seeker table
-app.get("/seeker", async (req, res) => {
-  const seeker_id = req.user.user_id;
-  const email = req.user.email;
-
-  if (!seeker_id) {
-    return res.status(400).json({ error: "Missing seeker_id" });
-  }
-
-  try {
-    let check;
-    check = await checkUser(req, email);
-    if (check.exists == false) {
-      throw {
-        status: 400,
-        error: "failed to get seeker",
-        reason: "user not found",
-      };
-    }
-    const [seeker] = await req.db.query(
-      `SELECT first_name, last_name FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
-      {
-        seeker_id: seeker_id,
-      }
-    );
-    res.status(200).json(seeker[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to get seeker" });
-  }
-});
-
-
-//save job to database
-app.post("/save-job", async (req, res) => {
-  const seeker_id = req.user.user_id;
-  const email = req.user.email;
-  const { job_id } = req.body;
-
-  if (!seeker_id || !job_id) {
-    return res.status(400).json({ error: "Missing seeker_id or job_id" });
-  }
-
-  try {
-    let check;
-    check = await checkUser(req, email);
-    if (check.exists == false) {
-      throw {
-        status: 400,
-        error: "failed to save job",
-        reason: "user not found",
-      };
-    }
-    await req.db.query(
-      "INSERT INTO saved_job (seeker_id, job_id) VALUE (UNHEX(:seeker_id), :job_id)",
-      {
-        seeker_id: seeker_id,
-        job_id: job_id,
-      }
-    );
-    res.status(200).json({ message: "Job saved successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to save job" });
-  }
-});
-
-//fetch saved jobs from database
-app.get("/saved-jobs", async (req, res) => {
-  const seeker_id = req.user.user_id;
-  const email = req.user.email;
-
-  if (!req.user.user_id) {
-    return res.status(400).json({ error: "Missing seeker_id" });
-  }
-
-  try {
-    let check;
-    check = await checkUser(req, email);
-    if (check.exists == false) {
-      throw {
-        status: 400,
-        error: "failed to get saved jobs",
-        reason: "user not found",
-      };
-    }
-    const [rows] = await req.db.query(
-      `SELECT job.* 
-       FROM saved_job 
-       INNER JOIN job ON saved_job.job_id = job.job_id 
-       WHERE saved_job.seeker_id = UNHEX(:seeker_id)`,
-      {
-        seeker_id: seeker_id,
-      }
-    );
-    res.status(200).json(rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to get saved jobs" });
-  }
-});
-
-//remove job
-app.delete("/saved-jobs/:jobId", async (req, res) => {
-  const seeker_id = req.user.user_id;
-  const jobId = req.params.jobId;
-
-  if (!seeker_id || !jobId) {
-    return res.status(400).json({ error: "Missing seeker_id or jobId" });
-  }
-
-  try {
-    const [result] = await req.db.query(
-      `DELETE FROM saved_job WHERE seeker_id = UNHEX(:seeker_id) AND job_id = :jobId`,
-      {
-        seeker_id: seeker_id,
-        jobId: jobId,
-      }
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Job not found" });
-    }
-
-    res.status(200).json({ message: "Job removed successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to remove job" });
-  }
-});
-
-const bob = "re";
-
-//add a logout endpoint
-app.post("/logout", (req, res) => {
-  const newTime = new Date(Date.now()); // for logging
-  writer.write(`${setTimestamp(newTime)} | logout attempt\n`);
-  
-  // Clear client-side data instructions.
-  res.status(200).json({ success: true, message: "Logout successful. Please clear your token from the client." });
-  writer.write(
-      `${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | @${
-          req.socket.remoteAddress
-      }\n`
-  );
-});
-
-
 app.listen(port, () => {
-  console.log(`server started on http://localhost:${port} @ ${time}`);
+  console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
+  console.log('test log')
   writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });
