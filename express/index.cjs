@@ -383,9 +383,10 @@ app.get('/api/jobs', async (req, res) => {
 // forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} || source: /forget-password\n`);
   const { email } = req.body;
 
+  writer.write(`${setTimestamp(newTime)} || source: /forget-password | info: reset attempt: password || attempt: ${email}@${req.socket.remoteAddress}\n`);
+  
   try {
     if (!email) {
       throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'missing field'});
@@ -406,14 +407,14 @@ app.post('/forgot-password', async (req, res) => {
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success | Email successfully sent\n `);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success | Email successfully sent || ${email}@${req.socket.remoteAddress}\n `);
 
     res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
-      writer.write(`${setTimestamp(netTime)} | status: 500 | source: /forget-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /forget-password | error: ${err} || attempt: ${email}@${req.socket.remoteAddress}\n`);
     } 
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
@@ -427,8 +428,8 @@ app.put('/reset-password', async (req, res) => {
   console.log('reset password attempt')
   const newTime = new Date(Date.now());
   const { token, newPassword } = req.body;
-  writer.write(`${setTimestamp(newTime)} || source: /reset-password\n`)
-  let userId, usertype;
+  let userId, usertype, email;
+  writer.write(`${setTimestamp(newTime)} || source: /reset-password | info: resetting password || attempt: ${email}@${req.socket.remoteAddress}\n`);
 
   try {
     if (!token || !newPassword) {
@@ -438,6 +439,7 @@ app.put('/reset-password', async (req, res) => {
     const user = jwt.verify(token, process.env.JWT_KEY);
     userId = user.id;
     usertype = user.type;
+    email = user.email;
 
     const hash = await bcrypt.hash(newPassword, 10);
 
@@ -453,11 +455,12 @@ app.put('/reset-password', async (req, res) => {
 
     const result = await req.db.query(query, params);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success | Password successfully reset | 1 attempt + ${userId}\n`);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success: Password successfully reset || ${userId}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
     console.warn(err);
+
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
       writer.write(`${setTimestamp(netTime)} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
