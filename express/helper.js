@@ -177,14 +177,10 @@ module.exports = {
         jwt: encodedUser
       }
     } catch(err) {
-      console.warn(err);
       if(!err.reason) {
-        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+        return {status: 500, error: err.message, reason: null};
       }
-      else {
-        writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
-      }
-        return err;
+      return err;
     }
     
   },

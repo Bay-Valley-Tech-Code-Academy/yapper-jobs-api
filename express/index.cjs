@@ -298,14 +298,16 @@ app.post('/login/seeker', async (req, res) => {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
     const users = await login(req, email, pass, 'seeker');
-    
+    if(users.status) {
+      throw({status: users.status, error: users.error, reason: users.reason})
+    }
     res.status(200)
     .json({
-      success: true, 
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      jwt: users.jwt
+    success: true, 
+    firstName: users.first_name,
+    lastName: users.last_name,
+    email: users.email,
+    jwt: users.jwt
     });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
@@ -344,8 +346,10 @@ app.post('/login/employer', async (req, res) => {
     if(check.exists === false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass, 'employer');
-    
+    const users = await login(req, email, pass);
+    if(users.status) {
+      throw({status: users.status, error: users.error, reason: users.reason})
+    }
     res.status(200).json({
       success: true,
       firstName: users.firstName,
