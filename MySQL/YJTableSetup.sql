@@ -36,9 +36,7 @@ CREATE TABLE Job (
 	job_description TEXT NOT NULL,
 	questions JSON,
 	delete_flag BOOLEAN NOT NULL DEFAULT 0,
-	date_created datetime,
-	expires boolean,
-    date_expires datetime,
+	created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	employer_id BINARY(16),
 	PRIMARY KEY (job_id),
 	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
@@ -138,13 +136,11 @@ VALUE('example', 'example', 'example', 'EX', 'example', 'example', 'example', 'e
 # undo with UNHEX()
 #
 #
-#
-#
 # how to width numbers:
 # SELECT LPAD(<column>, <width>, 0) FROM <table>;
 #
 # For date comparison
-# select DATEDIFF(tests, test2) as bob, test2 from test;
+# SELECT EXTRACT(year_month  FROM '2019-07-02 01:02:03');
 #
 # For date display
-# SELECT DATE_FORMAT([date], '%Y-%m-%d');
+# SELECT DATE_FORMAT('2009-10-04 22:23:00', '%Y-%m');

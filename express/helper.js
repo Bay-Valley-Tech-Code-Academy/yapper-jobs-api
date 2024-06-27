@@ -170,6 +170,7 @@ module.exports = {
       }
       const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
       return {
+        id: users.user_id,
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
