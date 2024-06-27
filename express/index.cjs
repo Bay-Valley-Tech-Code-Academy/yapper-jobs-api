@@ -301,11 +301,11 @@ app.post('/login/employer', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email, `employer`);
+    check = await checkUser(req, email);
     if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass);
+    const users = await login(req, email, pass, 'employer');
     if(users.status) {
       throw({status: users.status, error: users.error, reason: users.reason})
     }
