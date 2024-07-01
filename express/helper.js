@@ -177,9 +177,10 @@ module.exports = {
         jwt: encodedUser
       }
     } catch(err) {
-        console.warn(err);
-        writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
-        return err;
+      if(!err.reason) {
+        return {status: 500, error: err.message, reason: null};
+      }
+      return err;
     }
     
   },

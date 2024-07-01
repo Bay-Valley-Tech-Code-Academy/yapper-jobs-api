@@ -258,35 +258,17 @@ app.post('/login/seeker', async (req, res) => {
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
-    const [[users]] = await req.db.query(`SELECT :first_name, :last_name, user_pass, email, hex(seeker_id) AS user_id FROM Seeker
-      WHERE (email = :email AND delete_flag = 0);`,
-      {email: email}
-    );
-    if (!users) {
-      throw({status: 500, error: 'failed login', reason: 'user does not exist'});
+    const users = await login(req, email, pass, 'seeker');
+    if(users.status) {
+      throw({status: users.status, error: users.error, reason: users.reason})
     }
-    const dbPassword = `${users.user_pass}`;
-    const compare = await bcrypt.compare(pass, dbPassword);
-    if(!compare) {
-      throw({status: 400, error: 'failed login',reason: 'incorrect password'});
-    }
-    const payload = {
-      user_id: users.user_id,
-      // firstName: users.first_name,
-      // lastName: users.last_name,
-      email: users.email,
-      exp: timeNow + (60 * 60 * 24 * 7 * 2)
-    }
-    
-    const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
-    
     res.status(200)
     .json({
-      success: true, 
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      jwt: encodedUser
+    success: true, 
+    firstName: users.first_name,
+    lastName: users.last_name,
+    email: users.email,
+    jwt: users.jwt
     });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
@@ -320,12 +302,14 @@ app.post('/login/employer', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email, `employer`);
+    check = await checkUser(req, email);
     if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass);
-    
+    const users = await login(req, email, pass, 'employer');
+    if(users.status) {
+      throw({status: users.status, error: users.error, reason: users.reason})
+    }
     res.status(200).json({
       success: true,
       firstName: users.firstName,
