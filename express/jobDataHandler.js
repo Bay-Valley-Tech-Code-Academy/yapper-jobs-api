@@ -51,6 +51,17 @@ const insertJobsIntoDatabase = async (jobData) => {
       database: process.env.DB_NAME,
     });
 
+    // Retrieve the employer_id using the email
+    const [rows] = await connection.execute(
+      "SELECT employer_id FROM employer WHERE email = ?",
+      ["yapper@gmail.com"]
+    );
+    const employerId = rows.length > 0 ? rows[0].employer_id : null;
+
+    if (!employerId) {
+      throw new Error("Employer not found for the given email");
+    }
+
     // Insert job data into the database
     for (const job of jobData) {
       let experienceLevel;
@@ -71,8 +82,9 @@ const insertJobsIntoDatabase = async (jobData) => {
       );
 
       await connection.execute(
-        "INSERT INTO job (title, company, city, state, is_remote, employment_type, experience_level, job_description, salary_low, salary_high, benefits, website, industry) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO job (employer_id, title, company, city, state, is_remote, employment_type, experience_level, job_description, salary_low, salary_high, benefits, website, industry) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
+          employerId, //employer_id
           job.job_title, // title
           job.employer_name, //company
           job.job_city, //city
