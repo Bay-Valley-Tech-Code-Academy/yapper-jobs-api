@@ -218,7 +218,7 @@ module.exports = {
   // numeric
   validN: function (check) {
     if(typeof(check) === 'number') {
-      if(check < 1000000) {
+      if(check < 1000000 && check > 0) {
         return true;
       }
     }
