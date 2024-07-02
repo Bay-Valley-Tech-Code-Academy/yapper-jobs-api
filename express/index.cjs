@@ -107,7 +107,7 @@ app.use('/register', registerLimiter);
 //app.use('/resume', resumeLimiter);
 
 // Register endpoint for job seeker
-app.post('/register/seeker', async (req, res) => {t
+app.post('/register/seeker', async (req, res) => {
   console.log('registration attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);// for jwt expiration
   const newTime = new Date(Date.now());// for logging
@@ -337,16 +337,11 @@ app.post('/login/employer', async (req, res) => {
     if(!validSAN(email, 255) || !validSAN(pass, 255)) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    let check;
-    try {
-      check = await checkUser(req, email);
-    } catch (err) {
-      throw({status:500, error: err.message, reason: 'check failed'});
-    }
-    if(check.exists === false) {
+    check = await checkUser(req, email);
+    if(check.exists == false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
-    const users = await login(req, email, pass);
+    const users = await login(req, email, pass, 'employer');
     if(users.status) {
       throw({status: users.status, error: users.error, reason: users.reason})
     }
@@ -447,6 +442,11 @@ app.post('/forgot-password', async (req, res) => {
       throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'missing field'});
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'invalid email format'});
+    }
+
      // Use checkUser helper function
      const user = await checkUser(req, email);
 
@@ -457,7 +457,7 @@ app.post('/forgot-password', async (req, res) => {
     const { usertype, userId } = user;
 
     // Create a reset token
-    const resetToken = jwt.sign({email, id: userId, type: usertype}, process.env.JWT_KEY, { expiresIn: '1h' });
+    const resetToken = jwt.sign({email: email, id: userId, type: usertype}, process.env.JWT_KEY, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
