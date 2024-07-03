@@ -510,7 +510,7 @@ app.put('/reset-password', async (req, res) => {
 
     const result = await req.db.query(query, params);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success: Password successfully reset || ${userId}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success: Password successfully reset || ${email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
@@ -518,7 +518,7 @@ app.put('/reset-password', async (req, res) => {
 
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
-      writer.write(`${setTimestamp(netTime)} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     } 
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
@@ -1558,7 +1558,6 @@ app.post("/logout", (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
-  console.log('test log')
-  writer.write(`${setTimestamp(time)} | | source: server | info: server started | | port: ${port}\n`);
+  console.log(`server started on http://localhost:${port} @ ${time}`);
+  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });
