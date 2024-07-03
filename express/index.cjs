@@ -655,6 +655,7 @@ app.post('/job/add', async (req, res) => {
       `,{
         user_id: req.user.user_id
       });
+
       const job = await req.db.query(`
         INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
         VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
@@ -709,6 +710,8 @@ app.post('/job/add', async (req, res) => {
     }
   }
 });
+
+
 
 // Add resume endpoint
 app.post('/resume/add', async (req, res) => {
