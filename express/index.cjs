@@ -630,7 +630,7 @@ app.post('/job/add', async (req, res) => {
       !validState(state)              ||
       !validA(experienceLevel, 255)   ||
       !validSAN(employmentType, 255)  ||
-      !validN(companySize)            ||
+      !validSAN(companySize,255)      ||
       !validN(salaryLow)              ||
       !validN(salaryHigh)             ||
       !validJSON(benefits)            ||
