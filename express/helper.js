@@ -55,7 +55,7 @@ function validJSON (check) {
     return valid;
   } catch (err) {
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+    writer.write(`${setTimestamp(newTime)} | | source: helper validJSON | error: ${err.message} | | server\n`);
     return false;
   }
 }
@@ -67,9 +67,9 @@ module.exports = {
     try {
       const [[check]] = await req.db.query(`
       SELECT CASE 
-        WHEN EXISTS(SELECT 1 FROM Employer WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Employer WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Employer WHERE (email = :email AND delete_flag = 0))
-        WHEN EXISTS(SELECT 1 FROM Seeker WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Seeker WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Seeker WHERE (email = :email AND delete_flag = 0))
         ELSE NULL
       END AS checked,
@@ -90,20 +90,18 @@ module.exports = {
       `,{
         email: email
       });
-
       switch (check.checked) {// query return logic
         case 0:
           return {exists: true, reason: 'email already registered', usertype: check.usertype, userId: check.user_id};
         case 1:
-          return {exists: false, reason: null};
         case null:
-          return {exists: false, reason: null};
+          return {exists: false, reason: 'user not found'};
         default:
-          throw('unexpected value returned while searching');
+          throw({message: 'unexpected value returned while searching'});
       }
     } catch(err) {
         console.warn(err);
-        writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+        writer.write(`${setTimestamp(newTime)} | | source: helper.checkUser | error: ${err.message} | | server\n`);
         return err;
     }
   },
@@ -124,7 +122,7 @@ module.exports = {
       }
     } catch (err) {
       console.log(err.message);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.checkAuth | error: ${err.message} | | server\n`);
       return err;
     }
   },
@@ -132,6 +130,7 @@ module.exports = {
   login: async function (req, email, pass, table) {
     const timeNow = Math.ceil(Date.now() / 1000);
     const newTime = new Date(Date.now());
+    bob(email)
     try {
       let users;
       if(table == 'seeker'){
@@ -170,6 +169,7 @@ module.exports = {
       }
       const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
       return {
+        id: users.user_id,
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
@@ -288,7 +288,7 @@ module.exports = {
       return valid;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validJSON | error: ${err} | | server\n`);
       return false;
     }
   },
@@ -308,7 +308,7 @@ module.exports = {
       return newCheck < newMax ? true : false;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validDate | error: ${err} | | server\n`);
       return false;
     }
   },
@@ -332,7 +332,7 @@ module.exports = {
         day2 = iPar(arr2[2]);
       }
       if(year <= year2) {
-        if(month <= month2) {
+        if(month <= month2 || year < year2) {
           if(arr[2] && arr2[2] && year === year2 && month === month2) {
             if(day > day2) return false;
           }
@@ -342,7 +342,7 @@ module.exports = {
       return false;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validDates | error: ${err} | | internal\n`);
       return false;
     }
   },
@@ -368,7 +368,7 @@ module.exports = {
       };
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validExpDate | error: ${err} | | server\n`);
       return {valid: false};
     }
   },
