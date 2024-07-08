@@ -29,6 +29,7 @@ function iPar(str) {
 }
 
 function validSAN (check, len) {
+  console.log("Valid SAN", bob(1))
   if(typeof(check) === 'string') {
     if(check.length < 3 || check.length > len) return false;
     const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
@@ -39,8 +40,9 @@ function validSAN (check, len) {
 }
 
 function validJSON (check) {
+  console.log("Valid JSON", bob(2))
   const newTime = new Date(Date.now());
-  if(check === undefined || check === null) return true;
+  if(check === null || check === undefined) return true;
   if(typeof(check) !== 'object') return false;
   try{
     const arr = Object.values(check);
@@ -207,6 +209,7 @@ module.exports = {
   // validate input
   // alpha
   validA: function (check, len) {
+    console.log("Valid A", bob(3))
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z ]+$/g;
@@ -218,6 +221,7 @@ module.exports = {
 
   // numeric
   validN: function (check) {
+    console.log("Valid A", bob(4))
     if(typeof(check) === 'number') {
       if(check < 1000000) {
         return true;
@@ -228,6 +232,7 @@ module.exports = {
 
   // alphanumeric
   validAN: function (check, len) {
+    console.log("Valid A", bob(5))
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z 0-9]+$/g;
@@ -239,6 +244,7 @@ module.exports = {
   
   // special characters + alphanumeric
   validSA: function (check, len) {
+    console.log("Valid A", bob(6))
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z \!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
@@ -250,6 +256,7 @@ module.exports = {
 
   // special characters + alphanumeric
   validSAN: function (check, len) {
+    console.log("Valid SAN", bob(7))
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
@@ -261,6 +268,7 @@ module.exports = {
 
   // state
   validState: function (check) {
+    console.log("Valid State", bob(8))
     if(typeof(check) === 'string') {
       if(check.length === 2) {
         const arr = TLAbbr.filter((state) => state === check);
@@ -272,6 +280,7 @@ module.exports = {
 
   // json
   validJSON: function (check) {
+    console.log("Valid JSON", bob(9))
     const newTime = new Date(Date.now());
     if(check === null) return true;
     if(typeof(check) !== 'object') return false;
@@ -295,6 +304,7 @@ module.exports = {
 
   // date const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/
   validDate: function (check) {
+    console.log("Valid Date", bob(10))
     const newTime = new Date(Date.now());
     const pattern = /^[1-2][0-9][0-9][0-9]-[0-1][0-9]+$/;
     if(!pattern.test(check)) return false;
@@ -315,6 +325,7 @@ module.exports = {
 
   // non-paradoxical dates
   validDates: function (check, check2) {
+    console.log("Valid Dates", bob(11))
     const newTime = new Date(Date.now());
     try{
       const arr = check.split('-');
@@ -349,6 +360,7 @@ module.exports = {
 
   // expiration date
   validExpDate: function (check) {
+    console.log("Valid ValidExpDate", bob(12))
     const newTime = new Date(Date.now());
     const pattern = /^2[0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]+$/;
     if(check === null) return {valid: true};

@@ -6,8 +6,7 @@ const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit')
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');const { title } = require('process');
-const { sendEmail } = require('./Email.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');const { title } = require('process');const { sendEmail } = require('./Email.js');
 require('dotenv').config();
 const { fetchAndSaveJobs } = require('./jobDataHandler.js');
 
@@ -549,6 +548,7 @@ app.use(async function verifyJwt(req, res, next) {
     try {
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
+      console.log("Verify JWT", bob(req.user))
       writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
       await next();
     } catch (err) {
@@ -1058,6 +1058,7 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
   writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {answers} = req.body;
   const job_id = parseInt(req.params.job_id);
+  console.log(job_id)
   try{
     if(!job_id) {
       throw({status: 400, error: 'failed application add', reason: 'missing field'});
@@ -1544,8 +1545,6 @@ app.delete("/saved-jobs/:jobId", async (req, res) => {
     res.status(500).json({ error: "Failed to remove job" });
   }
 });
-
-// const bob = "re";
 
 //add a logout endpoint
 app.post("/logout", (req, res) => {

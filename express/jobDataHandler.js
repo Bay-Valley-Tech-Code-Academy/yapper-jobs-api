@@ -41,8 +41,19 @@ const getEmploymentTypeDescription = (employmentType) => {
   }
 };
 
+
 const insertJobsIntoDatabase = async (jobData) => {
   try {
+    const predefinedQuestions = [
+      "First Name",
+      "Last Name",
+      "Phone Number",
+      "City",
+      "State",
+      "Will you be able to make the commute?",
+      "Are you authorized to work in the United States?",
+      "Are you a veteran?",
+    ];
     // Connect to the database
     const connection = await mysql.createConnection({
       host: process.env.DB_HOST,
@@ -74,7 +85,15 @@ const insertJobsIntoDatabase = async (jobData) => {
       // Convert benefits array to JSON string or set to null
       const benefits = job.job_benefits
         ? JSON.stringify(job.job_benefits)
-        : null; 
+        : null;
+
+      // Convert qualifications array to JSON or set to null
+      const certifications = job.job_highlights && job.job_highlights.Qualifications
+        ? JSON.stringify(job.job_highlights.Qualifications)
+        : null;
+
+      // Convert predefined questions array to JSON string
+      const questions = JSON.stringify(predefinedQuestions);
 
       //apply function to convert employment type to the property
       const employmentTypeDescription = getEmploymentTypeDescription(
@@ -82,7 +101,7 @@ const insertJobsIntoDatabase = async (jobData) => {
       );
 
       await connection.execute(
-        "INSERT INTO job (employer_id, title, company, city, state, is_remote, employment_type, experience_level, job_description, salary_low, salary_high, benefits, website, industry) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO job (employer_id, title, company, city, state, is_remote, employment_type, experience_level, job_description, salary_low, salary_high, benefits, website, industry, questions, certifications) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
           employerId, //employer_id
           job.job_title, // title
@@ -98,6 +117,8 @@ const insertJobsIntoDatabase = async (jobData) => {
           benefits,
           job.employer_website || "Not specified",
           job.employer_company_type || "Not specified",
+          questions, //questions
+          certifications, //qualifications or certifications
         ]
       );
     }
