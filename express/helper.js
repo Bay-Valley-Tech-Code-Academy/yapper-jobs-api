@@ -7,10 +7,19 @@ const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for a
 // Two letter abbreviation for states, Puerto Rico, and D.C.
 const TLAbbr = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
+let it = 0;
 
 // for testing
 function bob(msg) {
-  console.log(msg);
+  if(!msg) {
+    console.log(it);
+    it++;
+  } else if (msg === 'reset') {
+    console.log('resetting count');
+    it = 0;
+  } else {
+    console.log(msg);
+  }
 }
 
 function setTimestamp (timeUpdate) {
@@ -130,7 +139,6 @@ module.exports = {
   login: async function (req, email, pass, table) {
     const timeNow = Math.ceil(Date.now() / 1000);
     const newTime = new Date(Date.now());
-    bob(email)
     try {
       let users;
       if(table == 'seeker'){
@@ -272,7 +280,7 @@ module.exports = {
   // json
   validJSON: function (check) {
     const newTime = new Date(Date.now());
-    if(check === null) return true;
+    if(check === null || check === undefined) return true;
     if(typeof(check) !== 'object') return false;
     try{
       const arr = Object.values(check);

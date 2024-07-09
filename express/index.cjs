@@ -18,9 +18,19 @@ const corsOptions = {
   optionSuccessStatus: 200,
 }
 
+let it = 0;
+
 // for testing
 function bob(msg) {
-  console.log(msg);
+  if(msg === undefined) {
+    console.log(it);
+    it++;
+  } else if (msg === 'reset') {
+    console.log('resetting count');
+    it = 0;
+  } else {
+    console.log(msg);
+  }
 }
 
 const time = new Date(Date.now());// used to log server start
@@ -370,45 +380,198 @@ app.post('/login/employer', async (req, res) => {
 app.get('/job/search/get', async (req, res) => {
   console.log('get attempt: jobs');
   const newTime = new Date(Date.now());
-  const start_index = parseInt(req.query.startIndex);
-  const per_page = parseInt(req.query.perPage);
-  const search_type = req.query.type;
-  const search_query = req.query.terms;
+  //const search_type = req.query.type;
+  const keywords = !req.query.key ? null : req.query.key;
+  const location = !req.query.loc ? null : req.query.loc;
+  const remote = req.query.rem !== 'true' ? false : true;
+  const industry = !req.query.ind ? null : req.query.ind;
+  const experience_level = !req.query.exp ? null : req.query.exp;
+  const employment_type = !req.query.emp ? null : req.query.emp;
+  const company_size = !req.query.size ? null : req.query.size;
+  const salary_range = !req.query.sal ? null : req.query.sal;
+  const benefits = !req.query.ben ? null : req.query.ben;
+  const certifications = !req.query.cert ? null : req.query.cert;
   writer.write(`${setTimestamp(newTime)} | | source: /job/search/get | info: get attempt: jobs | | attempt: @${req.socket.remoteAddress}\n`);
   try {
-    if(!validN(start_index) || !validN(per_page) || !validSAN(search_type) || search_query.indexOf(';') !== -1 || search_query.indexOf('/') !== -1) {
+    const start_index = parseInt(req.query.startIndex);
+    const per_page = parseInt(req.query.perPage);
+    const args = {start_index: start_index, per_page: per_page};
+    let search_query = 'SELECT company, city, state, is_remote, salary_low, salary_high, employment_type FROM Job WHERE (job_id >= :start_index';
+    if(remote === true) {
+      search_query += ' AND remote = 1';
+    } else if(location !== null) {
+      if(!validSAN(location)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid location'});
+      }
+      search_query += ' AND city = :city AND state = :state';
+      const loc = location.split('-');// separate city and state
+      args.city = loc[0];
+      args.state = loc[1];
+    }
+    if(industry !== null) {
+      if(!validSAN(industry)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid industry'});
+      }
+      search_query += ' AND industry = :industry';
+      args.industry = industry;
+    }
+    if(experience_level !== null) {
+      if(!validSAN(experience_level)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid experience level'});
+      }
+      search_query += ' AND experience_level = :experience_level';
+      args.experience_level = experience_level;
+    }
+    if(employment_type !== null) {
+      if(!validSAN(employment_type)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid employment type'});
+      }
+      search_query += ' AND employment_type = :employment_type';
+      args.employment_type = employment_type;
+    }
+    if(company_size !== null) {
+      if(!validSAN(company_size)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid company size'});
+      }
+      search_query += ' AND company_size = :company_size';
+      args.company_size = company_size;
+    }
+    if(salary_range !== null) {
+      let low = 1;
+      let high = 999999;
+      if(salary_range.indexOf('-') !== -1) {
+        const sal = salary_range.split('-');// separate lowest and highest salary desired
+        if(sal[0] !== '') {
+          args.low = parseInt(sal[0]);
+          search_query += ' AND salary_low >= :low';
+        }
+        args.high = parseInt(sal[1]);
+        search_query += ' AND salary_high <= :high';
+      } else {
+        low = parseInt(salary_range);
+        search_query += ' AND salary_low >= :low';
+      }
+      if(!validN(low) || !validN(high)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'salary out of range'});
+      }
+    }
+    if(benefits !== null) {
+      if(!validSAN(benefits)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid benefits'});
+      }
+      if(benefits.indexOf('-') !== -1) {
+        const ben = benefits.split('-');
+        for(let i = 0; i < ben.length; i++) {
+          search_query += ` AND locate(:ben${i}, JSON_EXTRACT(job.benefits, "$[*]")) > 0`;
+          args['ben' + i] = ben[i];
+        }
+      } else {
+        search_query += ' AND locate(:benefits, JSON_EXTRACT(job.benefits, "$[*]")) > 0';
+        args.benefits = benefits;
+      }
+    }
+    if(certifications !== null) {
+      if(!validSAN(certifications)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid certifications'});
+      }
+      if(certifications.indexOf('-') !== -1) {
+        const cert = certifications.split('-');
+        for(let i = 0; i < cert.length; i++) {
+          search_query += ` AND locate(:cert${i}, JSON_EXTRACT(job.certifications, "$[*]")) > 0`;
+          args['cert' + i] = cert[i];
+        }
+      } else {
+        search_query += ' AND locate(:certifications, JSON_EXTRACT(job.certifications, "$[*]")) > 0';
+        args.certifications = certifications;
+      }
+    }
+    if(keywords !== null) {
+      let querystr = '';
+      if(keywords.indexOf(';') !== -1 || keywords.indexOf('/') !== -1 || keywords.indexOf('\\') !== -1) {
+        bob()
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+      }
+      if(keywords.indexOf('"') !== -1) {
+        let substr = [];
+        const substrquote = keywords.split('"');
+        bob(substrquote)
+        for(let i = 0; i < substrquote.length; i++) {
+          if(!validSAN(substrquote[i]) && substrquote[i]) {
+            throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+          }
+          if(substrquote[i] === '') continue;
+          if(i % 2 === 0) {
+            bob(i)
+            if(substrquote[i].indexOf(' ') !== -1) {
+              substr = substr.concat(substrquote[i].split(' '));
+            }
+          } else {
+            const temp = '+"' + substrquote[i] + '"';
+            substr.push(temp);
+          }
+        }
+        for(let i = 0; i < substr.length; i++) {
+          if(substr[i].length === 0) continue;
+          if(!(i + 1 >= substr.length)) {
+            substr[i] += ' ';
+          }
+          querystr += substr[i]
+        }
+      } else {
+        if(!validSAN(keywords) && keywords === undefined) {
+          throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+        }
+        querystr = keywords;
+      }
+      search_query += ' AND MATCH (title, job_description, company, industry, experience_level, employment_type) AGAINST (:keyword IN BOOLEAN MODE)';
+      args.keywords = querystr;
+    }
+    search_query += ') LIMIT :per_page;';
+    bob(search_query)
+    bob(args)
+    const [jobs] = await req.db.query(search_query, args);
+  /*  try {
+    if(!validN(start_index) || !validN(per_page) || (search_type !== undefined && !validSAN(search_type))) {
+      bob()
       throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
     }
     let querystr = '';
     let jobs;
-    if(search_query.indexOf('"') !== -1) {
-      let substr = [];
-      const substrquote = search_query.split('"');
-      for(let i = 0; i < substrquote.length; i++) {
-        if(!validSAN(substrquote[i]) && substrquote[i]) {
-          throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
-        }
-        if(i % 2 === 0) {
-          substr = substr.concat(substrquote[i].split(' '));
-        } else {
-          const temp = '+"' + substrquote[i] + '"';
-          substr.push(temp);
-        }
-      }
-      for(let i = 0; i < substr.length; i++) {
-        if(substr[i].length === 0) continue;
-        if(!(i + 1 >= substr.length)) {
-          substr[i] += ' ';
-        }
-        querystr += substr[i]
-      }
-    } else {
-      if(!validSAN(search_query)) {
+    if(search_query !== null && search_query !== undefined) {
+      if(search_query.indexOf(';') !== -1 || search_query.indexOf('/') !== -1) {
+        bob()
         throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
       }
-      querystr = search_query;
-    }
-    if(search_query === null || search_query === undefined){
+      if(search_query.indexOf('"') !== -1) {
+        let substr = [];
+        const substrquote = search_query.split('"');
+        for(let i = 0; i < substrquote.length; i++) {
+          if(!validSAN(substrquote[i]) && substrquote[i]) {
+            bob()
+            throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+          }
+          if(i % 2 === 0) {
+            substr = substr.concat(substrquote[i].split(' '));
+          } else {
+            const temp = '+"' + substrquote[i] + '"';
+            substr.push(temp);
+          }
+        }
+        for(let i = 0; i < substr.length; i++) {
+          if(substr[i].length === 0) continue;
+          if(!(i + 1 >= substr.length)) {
+            substr[i] += ' ';
+          }
+          querystr += substr[i]
+        }
+      } else {
+        if(!validSAN(search_query) && search_query === undefined) {
+          bob()
+          throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+        }
+        querystr = search_query;
+      }
+    } else {
       [jobs] = await req.db.query(`
         SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
         FROM Job
@@ -418,7 +581,8 @@ app.get('/job/search/get', async (req, res) => {
         start_index: start_index,
         per_page: per_page,
       });
-    } else if(search_type === 'keyword'){
+    }
+    if(search_type === 'keyword'){
       [jobs] = await req.db.query(`
         SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
         FROM Job
@@ -440,27 +604,29 @@ app.get('/job/search/get', async (req, res) => {
         query: querystr,
       });
     } else if(search_type === 'company') {
-      const que = `SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      [jobs] = await req.db.query(`SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
         FROM Job
-        WHERE (job_id >= :start_index AND ${search_type} = :query)
-        LIMIT :per_page;`;    
-      [jobs] = await req.db.query(que,{
+        WHERE (job_id >= :start_index AND company = :query)
+        LIMIT :per_page;
+      `,{
         start_index: start_index,
         per_page: per_page,
         query: querystr,
       });
     } else if(search_type === 'location') {
-      const loc = querystr.split('-');// separate city and state
-      const que = `SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
-        FROM Job
-        WHERE (job_id >= :start_index AND city = :city AND state = :state)
-        LIMIT :per_page;`;    
-      [jobs] = await req.db.query(que,{
-        start_index: start_index,
-        per_page: per_page,
-        city: loc[0],
-        state: loc[1],
-      });
+      if(!remote) {
+        const loc = querystr.split('-');// separate city and state 
+        [jobs] = await req.db.query(`SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+          FROM Job
+          WHERE (job_id >= :start_index AND city = :city AND state = :state)
+          LIMIT :per_page;
+          `,{
+          start_index: start_index,
+          per_page: per_page,
+          city: loc[0],
+          state: loc[1],
+        });
+      } else if ()
     } else if(search_type === 'salary') {
       let low = 1;
       let high = 999999;
@@ -473,12 +639,11 @@ app.get('/job/search/get', async (req, res) => {
       }
       if(!validN(low) || !validN(high)) {
         throw({status: 400, error: 'failed get attempt: jobs', reason: 'salary out of range'});
-      }
-      const que = `SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      }    
+      [jobs] = await req.db.query(`SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
         FROM Job
         WHERE (job_id >= :start_index AND salary_low >= :low AND salary_high <= :high)
-        LIMIT :per_page;`;    
-      [jobs] = await req.db.query(que,{
+        LIMIT :per_page;`,{
         start_index: start_index,
         per_page: per_page,
         low: low,
@@ -486,8 +651,8 @@ app.get('/job/search/get', async (req, res) => {
       });
     }
     if(!jobs[0]) {
-      throw({status: 500, error: 'failed get attempt: jobs', reason: 'no matching jobs found'});
-    }
+      throw({status: 404, error: 'failed get attempt: jobs', reason: 'no matching jobs found'});
+    } */
     res.status(200).json({success: true, jobs: jobs});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
@@ -535,8 +700,8 @@ app.get('/job/:job_id/get', async (req, res) => {
         throw({status: 500, error: 'failed job get', reason: 'search defaulted'});
     }
     const [[job]] = await req.db.query(`
-      SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
-      FROM Job
+      SELECT title, company, city, state, ,, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      FROM Job,
       WHERE job_id = :job_id;
     `,{
       job_id: job_id,
@@ -659,7 +824,7 @@ app.post('/job/add', async (req, res) => {
       !validState(state)              ||
       !validA(experienceLevel, 255)   ||
       !validSAN(employmentType, 255)  ||
-      !validN(companySize)            ||
+      !validSAN(companySize, 255)     ||
       !validN(salaryLow)              ||
       !validN(salaryHigh)             ||
       !validJSON(benefits)            ||
