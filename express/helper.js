@@ -115,19 +115,39 @@ module.exports = {
     }
   },
 
-  checkAuth: async function (req, user_id, company) {
+  checkAuth: async function (req, user_id, company, job_id) {
     const newTime = new Date(Date.now());
     try {
-      const [[check]] = await req.db.query(`
-      SELECT approve_flag, company FROM employer
-        WHERE employer_id = UNHEX(:id);
-      `, {
-        id: user_id
-      });
-      if(!check || !check.approve_flag || company !== check.company) {
-        return false;
+      if(!job_id) {
+        const [[check]] = await req.db.query(`
+        SELECT approve_flag, company FROM Employer
+          WHERE employer_id = UNHEX(:id);
+        `, {
+          id: user_id
+        });
+        if(!check || !check.approve_flag || company !== check.company) {
+          return false;
+        } else {
+          return true;
+        }
       } else {
-        return true;
+        const [[check]] = await req.db.query(`
+          SELECT approve_flag, company FROM Employer
+          WHERE employer_id = UNHEX(:id);
+        `, {
+          id: user_id
+        });
+        const [[check2]] = await req.db.query(`
+          SELECT company FROM Job
+          WHERE job_id = UNHEX(:id);
+        `, {
+          id: job_id
+        });
+        if(!check || !check2 || !check.approve_flag || company !== check.company || company !== check2.company) {
+          return false;
+        } else {
+          return true;
+        }
       }
     } catch (err) {
       console.log(err.message);

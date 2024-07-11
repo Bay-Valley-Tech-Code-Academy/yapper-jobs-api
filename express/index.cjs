@@ -1462,7 +1462,7 @@ app.get('/job/applications/resume', async (req, res) => {
       throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists === false) {
-      throw({status: 400, error: 'failed applicant resume get', reason: check.reason});
+      throw({status: 404, error: 'failed applicant resume get', reason: check.reason});
     }
     let auth;
     try {
@@ -1480,7 +1480,7 @@ app.get('/job/applications/resume', async (req, res) => {
       throw({status:500, error: err.message, reason: 'failed to find applicant'});
     }
     if(applicant.exists === false) {
-      throw({status: 400, error: 'failed applicant resume get', reason: seeker.reason});
+      throw({status: 404, error: 'failed applicant resume get', reason: seeker.reason});
     }
     try {
       const [[{resume_uploaded}]] = await req.db.query(`
@@ -1599,7 +1599,7 @@ app.get('/delete-user', async (req, res) => {
     deleter: "yes please",
     exp: timeNow + (60 * 10) 
   }
-  try{
+  try {
     const token = jwt.sign(payload, process.env.JWT_KEY);
     await sendDelete(req.user.email, token);
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n `);
@@ -1625,14 +1625,34 @@ app.delete('/delete', async (req, res) => {
   writer.write(`${setTimestamp(newTime)} | | source: /delete | info: delete ${req.user.email} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const token = req.query.token;
 
-  try{
+  try {
     const {user_id, type, deleter} = jwt.verify(token, process.env.JWT_KEY);
-    bob(user_id)
-    bob(type)
-    bob(deleter)
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n `);
-
-    res.status(200).json({ success: true, message: 'deleted user'});
+    if(deleter !== 'yes please' || !user_id || !validA(type)) {
+      throw({status: 404, error: 'failed user deletion', reason: 'invalid token'});
+    }
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 404, error: 'failed user deletion', reason: check.reason});
+    }
+    try {
+      const deleted = await req.db.query(`
+        UPDATE ${type}
+        SET delete_flag = 1
+        WHERE ${type}_id = UNHEX(:user_id);
+      `,{
+        user_id: user_id
+      });
+      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n `);
+  
+      res.status(200).json({ success: true, message: 'deleted user'});
+    } catch (err) {
+      throw({status: 500, error: err.message, reason: 'deletion failed'});
+    }
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
@@ -1644,9 +1664,52 @@ app.delete('/delete', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
-})
+});
 
-
+app.delete('/job/delete', async (req, res) => {
+  console.log('Delete request');
+  //const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());// for logging
+  const job_id = req.query.id;
+  writer.write(`${setTimestamp(newTime)} | | source: /job/delete | info: delete ${job_id} requested | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  try {
+    let check;
+    try {
+      check = await checkUser(req, req.user.email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 404, error: 'failed job deletion', reason: check.reason});
+    }
+    let auth;
+    try {
+      auth = await checkAuth(req, req.user.user_id, req.user.company, job_id);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'authorization failed'});
+    }
+    if(auth === false) {
+      throw({status: 403, error: 'failed job deletion', reason: 'failed approval'});
+    }
+    await req.db.query(`
+      UPDATE Job
+      SET delete_flag = 1
+      WHERE job_id = UNHEX(:job_id);
+    `,{
+      jpb_id: job_id
+    })
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
 
 
 
@@ -1803,9 +1866,16 @@ app.get("/saved-jobs", async (req, res) => {
       }
     );
     res.status(200).json(rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to get saved jobs" });
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
   }
 });
 
@@ -1813,12 +1883,12 @@ app.get("/saved-jobs", async (req, res) => {
 app.delete("/saved-jobs/:jobId", async (req, res) => {
   const seeker_id = req.user.user_id;
   const jobId = req.params.jobId;
-
-  if (!seeker_id || !jobId) {
-    return res.status(400).json({ error: "Missing seeker_id or jobId" });
-  }
-
+  writer.write(`${setTimestamp(newTime)} | | source: /saved-jobs/${jobId} | info: delete saved job attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+  
   try {
+    if (!seeker_id || !jobId) {
+      throw({status: 400, error: 'failed to delete saved job', reason: 'invalid input'});
+    }
     const [result] = await req.db.query(
       `DELETE FROM saved_job WHERE seeker_id = UNHEX(:seeker_id) AND job_id = :jobId`,
       {
@@ -1828,30 +1898,32 @@ app.delete("/saved-jobs/:jobId", async (req, res) => {
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Job not found" });
+      throw({status: 404, error: 'failed to delete saved job', reason: 'job not found'});
     }
-
+    
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /saved-jobs/${jobId} | success: deleted saved job | | ${req.user.email}@${req.socket.remoteAddress}\n`);
     res.status(200).json({ message: "Job removed successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to remove job" });
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs/${jobId} | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs/${jobId} | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
   }
 });
-
-// const bob = "re";
 
 //add a logout endpoint
 app.post("/logout", (req, res) => {
   const newTime = new Date(Date.now()); // for logging
-  writer.write(`${setTimestamp(newTime)} | logout attempt\n`);
+  writer.write(`${setTimestamp(newTime)} | | source: /logout | info: logout attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
   
   // Clear client-side data instructions.
   res.status(200).json({ success: true, message: "Logout successful. Please clear your token from the client." });
-  writer.write(
-      `${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | @${
-          req.socket.remoteAddress
-      }\n`
-  );
+  writer.write(`${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | | ${req.user.email}@${req.socket.remoteAddress}\n`);
 });
 
 app.listen(port, () => {
