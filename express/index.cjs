@@ -1696,7 +1696,7 @@ app.delete('/job/delete', async (req, res) => {
       SET delete_flag = 1
       WHERE job_id = UNHEX(:job_id);
     `,{
-      jpb_id: job_id
+      job_id: job_id
     })
   } catch (err) {
     console.warn(err);
