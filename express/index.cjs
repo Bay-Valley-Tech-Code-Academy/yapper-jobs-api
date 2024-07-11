@@ -637,7 +637,7 @@ app.post('/forgot-password', async (req, res) => {
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success: Email sent | | ${email}@${req.socket.remoteAddress}\n `);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success: Email sent | | ${email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
   } catch (err) {
@@ -1602,7 +1602,7 @@ app.get('/delete-user', async (req, res) => {
   try {
     const token = jwt.sign(payload, process.env.JWT_KEY);
     await sendDelete(req.user.email, token);
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n `);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'delete link sent to email'});
   } catch (err) {
@@ -1647,7 +1647,7 @@ app.delete('/delete', async (req, res) => {
       `,{
         user_id: user_id
       });
-      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n `);
+      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
   
       res.status(200).json({ success: true, message: 'deleted user'});
     } catch (err) {
