@@ -6,10 +6,10 @@ const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit');
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates, validAN} = require('./helper.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
 const { title } = require('process');
-const { application } = require('express');
-const { query } = require('express');
+const { error } = require('console');
+const { sendEmail, sendApplication, sendDelete } = require('./Email.js');
 require('dotenv').config();
 
 const corsOptions = {
@@ -34,7 +34,7 @@ function bob(msg) {
 }
 
 const time = new Date(Date.now());// used to log server start
-const writer = fs.createWriteStream('../ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
+const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 
 const app = express();
 const port = process.env.PORT; // default port
@@ -105,13 +105,13 @@ app.use(async (req, res, next) => {
 
 app.use('/login', loginLimiter);
 app.use('/register', registerLimiter);
+//app.use('/resume', resumeLimiter);
 
 // Register endpoint for job seeker
 app.post('/register/seeker', async (req, res) => {
   console.log('registration attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);// for jwt expiration
   const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | Registration attempt: seeker\n`);
   const {
     firstName,
     lastName,
@@ -121,10 +121,10 @@ app.post('/register/seeker', async (req, res) => {
   writer.write(`${setTimestamp(newTime)} | | source: /register/seeker | info: Registration attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     // check if input exists and is safe
-    if(firstName == null || lastName == null || pass == null || email == null) {
+    if(!firstName || !lastName || !pass || !email) {
       throw({status: 400, error: 'failed seeker add', reason: 'missing field'});
     }
-    if(!validSAN(firstName) || !validSAN(lastName) || !validSAN(pass) || !validSAN(email)) {
+    if(!validSA(firstName, 255) || !validSA(lastName, 255) || !validSAN(pass, 255) || !validSAN(email, 255)) {
       throw({status: 400, error: 'failed seeker add', reason: 'invalid input'});
     }
     // check if user or email already exists
@@ -155,8 +155,8 @@ app.post('/register/seeker', async (req, res) => {
         res.status(200)
         .json({
           success: true, 
-          firstName: users.first_name,
-          lastName: users.last_name,
+          firstName: users.firstName,
+          lastName: users.lastName,
           email: users.email,
           jwt: users.jwt
         });
@@ -184,7 +184,6 @@ app.post('/register/employer', async (req, res) => {
   console.log('Registration attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | registration attempt: employer\n`);
   const {
     firstName,
     lastName,
@@ -247,7 +246,7 @@ app.post('/register/employer', async (req, res) => {
           industry: industry
         });
         const users = await login(req, email, pass, 'employer');
-        
+        console.log(user)
         res.status(200)
         .json({
           success: true,
@@ -271,7 +270,7 @@ app.post('/register/employer', async (req, res) => {
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -281,14 +280,13 @@ app.post('/login/seeker', async (req, res) => {
   console.log('login attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | login attempt: seeker\n`);
   const {email, pass} = req.body;
   writer.write(`${setTimestamp(newTime)} | | source: /login/seeker | info: login attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if(!email || !pass) {
       throw({status: 400, error: 'failed seeker login', reason: 'missing field'});
     }
-    if(!validSAN(email) || !validSAN(pass)) {
+    if(!validSAN(email, 255) || !validSAN(pass, 255)) {
       throw({status: 400, error: 'failed seeker login', reason: 'invalid input'});
     }
     let check;
@@ -302,14 +300,16 @@ app.post('/login/seeker', async (req, res) => {
     }
     const users = await login(req, email, pass, 'seeker');
     if(users.status) {
-      throw({status: users.status, error: users.error, reason: users.reason});
+      throw({status: users.status, error: users.error, reason: users.reason})
     }
-    res.status(200).json({
-      success: true,
-      firstName: users.firstName,
-      lastName: users.lastName,
-      email: users.email,
-      jwt: users.jwt});
+    res.status(200)
+    .json({
+    success: true, 
+    firstName: users.firstName,
+    lastName: users.lastName,
+    email: users.email,
+    jwt: users.jwt
+    });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.warn(err);
@@ -329,17 +329,13 @@ app.post('/login/employer', async (req, res) => {
   console.log('login attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
   const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | login attempt: employer\n`);
   const {email, pass} = req.body;
   writer.write(`${setTimestamp(newTime)} | | source: /login/employer | info: login attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
     }
-    if(
-      !validSAN(email) ||
-      !validSAN(pass)
-    ) {
+    if(!validSAN(email, 255) || !validSAN(pass, 255)) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
     let check;
@@ -596,9 +592,115 @@ app.get('/job/:job_id/get', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
+})
+
+//fetch jobs table from database
+app.get("/api/jobs", async (req, res) => {
+  try {
+    const [jobs] = await req.db.query("SELECT * FROM job");
+    res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    console.error('Error fetching jobs:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
+  }
 });
 
+// forget password, should send email to link
+app.post('/forgot-password', async (req, res) => {
+  const newTime = new Date(Date.now());
+  const { email } = req.body;
 
+  writer.write(`${setTimestamp(newTime)} || source: /forget-password | info: reset attempt: password || attempt: ${email}@${req.socket.remoteAddress}\n`);
+  
+  try {
+    if (!email) {
+      throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'missing field'});
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'invalid email format'});
+    }
+
+     // Use checkUser helper function
+     const user = await checkUser(req, email);
+
+     if (!user.exists) {
+      throw({status: 404, success: false, error: 'failed reset attempt: password', reason: 'email not found'});
+     }
+
+    const { usertype, userId } = user;
+
+    // Create a reset token
+    const resetToken = jwt.sign({email: email, id: userId, type: usertype}, process.env.JWT_KEY, { expiresIn: '1h' });
+    const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
+
+    await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
+
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success: Email sent | | ${email}@${req.socket.remoteAddress}\n `);
+
+    res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({ success: false, error: 'Server failure' });
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /forget-password | error: ${err} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    } 
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /forget-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }   
+  }
+});
+
+// reset password
+app.put('/reset-password', async (req, res) => {
+  console.log('reset password attempt')
+  const newTime = new Date(Date.now());
+  const { token, newPassword } = req.body;
+  let userId, usertype, email;
+  writer.write(`${setTimestamp(newTime)} || source: /reset-password | info: resetting password | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+
+  try {
+    if (!token || !newPassword) {
+      throw({status: 400, success: false, error: 'failed reset attempt: password', reason: 'missing token or new password'});
+    }
+
+    const user = jwt.verify(token, process.env.JWT_KEY);
+    userId = user.id;
+    usertype = user.type;
+    email = user.email;
+
+    const hash = await bcrypt.hash(newPassword, 10);
+
+    let query, params;
+
+    if (usertype === 'seeker') {
+      query = 'UPDATE Seeker SET user_pass = :hash WHERE seeker_id = UNHEX(:userId) AND delete_flag = 0;';
+      params = { hash, userId };
+    } else {
+      query = 'UPDATE Employer SET user_pass = :hash WHERE employer_id = UNHEX(:userId) AND delete_flag = 0;';
+      params = { hash, userId };
+    }
+
+    const result = await req.db.query(query, params);
+
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success: Password successfully reset || ${email}@${req.socket.remoteAddress}\n`);
+
+    res.status(200).json({ success: true, message: 'Password reset successful' });
+  } catch (err) {
+    console.warn(err);
+
+    if(!err.reason) {
+      res.status(500).json({ success: false, error: 'Server failure' });
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    } 
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /reset-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    } 
+  }
+});
 
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
@@ -619,9 +721,11 @@ app.use(async function verifyJwt(req, res, next) {
     }
   
     try {
+      bob(1)
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
       writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
+      bob(2)
       await next();
     } catch (err) {
       console.log(err);
@@ -1118,14 +1222,13 @@ app.get('/resume', async (req, res) => {
   }
 });
 
+
 app.post('/job/apply/:job_id/submit', async (req, res) => {
   console.log('add attempt: application');
   const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {answers} = req.body;
-  bob(req.params)
   const job_id = parseInt(req.params.job_id);
-  bob(job_id)
   try{
     if(!job_id) {
       throw({status: 400, error: 'failed application add', reason: 'missing field'});
@@ -1134,10 +1237,12 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
       throw({status: 400, error: 'failed application add', reason: 'invalid input'});
     }
     let questions;
+    let employer;
+    let title;
     try {
-      [[{questions}]] = await req.db.query(`
-        SELECT questions
-        FROM job
+      [[{questions, employer, title}]] = await req.db.query(`
+        SELECT questions, HEX(employer_id) AS employer, title
+        FROM Job
         WHERE job_id = :job_id;
         `,{
           job_id: job_id,
@@ -1196,7 +1301,22 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
         seeker_id: req.user.user_id,
         job_id: job_id,
         answers: !answers ? null : JSON.stringify(answers),
-      })
+      });
+      const [[{email}]] = await req.db.query(`
+        SELECT email
+        FROM Employer
+        WHERE employer_id = UNHEX(:employer_id);
+      `,{
+        employer_id: employer,
+      });
+      const [[{first_name, last_name}]] = await req.db.query(`
+        SELECT first_name, last_name
+        FROM Seeker
+        WHERE seeker_id = UNHEX(:seeker_id);
+      `,{
+        seeker_id: req.user.user_id,
+      });
+      await sendApplication(email, {title: title}, {first_name: first_name, last_name: last_name});
       writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/apply | success: application added | | @${req.socket.remoteAddress}\n`);
       res.status(201).json({success: true, message: 'application submitted'})
     } catch (err) {
@@ -1459,7 +1579,7 @@ app.get('/job/applications/resume', async (req, res) => {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: //job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
@@ -1468,10 +1588,273 @@ app.get('/job/applications/resume', async (req, res) => {
   }
 });
 
-// from here
+app.get('/delete-user', async (req, res) => {
+  console.log('Delete request');
+  const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /delete-user | info: delete request | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const payload = {
+    user_id: req.user.user_id,
+    type: req.user.type,
+    deleter: "yes please",
+    exp: timeNow + (60 * 10) 
+  }
+  try{
+    const token = jwt.sign(payload, process.env.JWT_KEY);
+    await sendDelete(req.user.email, token);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n `);
+
+    res.status(200).json({ success: true, message: 'delete link sent to email'});
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+})
+
+app.delete('/delete', async (req, res) => {
+  console.log('Delete request');
+  //const timeNow = Math.ceil(Date.now() / 1000);
+  const newTime = new Date(Date.now());// for logging
+  writer.write(`${setTimestamp(newTime)} | | source: /delete | info: delete ${req.user.email} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const token = req.query.token;
+
+  try{
+    const {user_id, type, deleter} = jwt.verify(token, process.env.JWT_KEY);
+    bob(user_id)
+    bob(type)
+    bob(deleter)
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n `);
+
+    res.status(200).json({ success: true, message: 'deleted user'});
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//fetch user from seeker table
+app.get("/seeker", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const email = req.user.email;
+
+  if (!seeker_id) {
+    return res.status(400).json({ error: "Missing seeker_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to get seeker",
+        reason: "user not found",
+      };
+    }
+    const [seeker] = await req.db.query(
+      `SELECT first_name, last_name FROM seeker WHERE seeker_id = UNHEX(:seeker_id)`,
+      {
+        seeker_id: seeker_id,
+      }
+    );
+    res.status(200).json(seeker[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get seeker" });
+  }
+});
+//fetch user from employer table
+app.get("/employer", async (req, res) => {
+  const employer_id = req.user.user_id;
+  const email = req.user.email;
+
+  if (!employer_id) {
+    return res.status(400).json({ error: "Missing employer_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to get employer",
+        reason: "user not found",
+      };
+    }
+    const [employer] = await req.db.query(
+      `SELECT first_name, last_name FROM employer WHERE employer_id = UNHEX(:employer_id)`,
+      {
+        employer_id: employer_id,
+      }
+    );
+    res.status(200).json(employer[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get employer" });
+  }
+});
+
+
+//save job to database
+app.post("/save-job", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const email = req.user.email;
+  const { job_id } = req.body;
+
+  if (!seeker_id || !job_id) {
+    return res.status(400).json({ error: "Missing seeker_id or job_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to save job",
+        reason: "user not found",
+      };
+    }
+    await req.db.query(
+      "INSERT INTO saved_job (seeker_id, job_id) VALUE (UNHEX(:seeker_id), :job_id)",
+      {
+        seeker_id: seeker_id,
+        job_id: job_id,
+      }
+    );
+    res.status(200).json({ message: "Job saved successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to save job" });
+  }
+});
+
+//fetch saved jobs from database
+app.get("/saved-jobs", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const email = req.user.email;
+
+  if (!req.user.user_id) {
+    return res.status(400).json({ error: "Missing seeker_id" });
+  }
+
+  try {
+    let check;
+    check = await checkUser(req, email);
+    if (check.exists == false) {
+      throw {
+        status: 400,
+        error: "failed to get saved jobs",
+        reason: "user not found",
+      };
+    }
+    const [rows] = await req.db.query(
+      `SELECT job.* 
+       FROM saved_job 
+       INNER JOIN job ON saved_job.job_id = job.job_id 
+       WHERE saved_job.seeker_id = UNHEX(:seeker_id)`,
+      {
+        seeker_id: seeker_id,
+      }
+    );
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to get saved jobs" });
+  }
+});
+
+//remove job
+app.delete("/saved-jobs/:jobId", async (req, res) => {
+  const seeker_id = req.user.user_id;
+  const jobId = req.params.jobId;
+
+  if (!seeker_id || !jobId) {
+    return res.status(400).json({ error: "Missing seeker_id or jobId" });
+  }
+
+  try {
+    const [result] = await req.db.query(
+      `DELETE FROM saved_job WHERE seeker_id = UNHEX(:seeker_id) AND job_id = :jobId`,
+      {
+        seeker_id: seeker_id,
+        jobId: jobId,
+      }
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    res.status(200).json({ message: "Job removed successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to remove job" });
+  }
+});
+
+// const bob = "re";
+
+//add a logout endpoint
+app.post("/logout", (req, res) => {
+  const newTime = new Date(Date.now()); // for logging
+  writer.write(`${setTimestamp(newTime)} | logout attempt\n`);
+  
+  // Clear client-side data instructions.
+  res.status(200).json({ success: true, message: "Logout successful. Please clear your token from the client." });
+  writer.write(
+      `${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | @${
+          req.socket.remoteAddress
+      }\n`
+  );
+});
 
 app.listen(port, () => {
-  console.log(`server started on http://${process.env.DB_HOST}:${port} @ ${time}`);
-  bob('test')
-  writer.write(`${setTimestamp(time)} | | source: server | info: server started | | port: ${port}\n`);
+  console.log(`server started on http://localhost:${port} @ ${time}`);
+  writer.write(`${setTimestamp(time)} | port: ${port} | server started\n`)
 });

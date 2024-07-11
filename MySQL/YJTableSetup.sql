@@ -148,13 +148,11 @@ VALUE(UNHEX('00000000000000000000000000000001'), 1, null);
 # undo with UNHEX()
 #
 #
-#
-#
 # how to width numbers:
 # SELECT LPAD(<column>, <width>, 0) FROM <table>;
 #
 # For date comparison
-# select DATEDIFF(tests, test2) as bob, test2 from test;
+# SELECT EXTRACT(year_month  FROM '2019-07-02 01:02:03');
 #
 # For date display
-# SELECT DATE_FORMAT([date], '%Y-%m-%d');
+# SELECT DATE_FORMAT('2009-10-04 22:23:00', '%Y-%m');

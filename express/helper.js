@@ -177,6 +177,7 @@ module.exports = {
       }
       const encodedUser = jwt.sign(payload, process.env.JWT_KEY);
       return {
+        id: users.user_id,
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
@@ -258,7 +259,7 @@ module.exports = {
   // special characters + alphanumeric
   validSAN: function (check, len) {
     if(typeof(check) === 'string') {
-      if(check.length < 3 || check.length > len) return false;
+      if(check.length < 1 || check.length > len) return false;
       const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
       const checked = pattern.test(check);
       return checked;
