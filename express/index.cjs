@@ -10,16 +10,14 @@ const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, val
 require('dotenv').config();
 const { fetchAndSaveJobs } = require('./jobDataHandler.js');
 
-
 // Call fetchAndSaveJobs function to fetch and save job data
 //Comment this code block out to avoid fetching data from the API each time you run server
-// try {
-//   fetchAndSaveJobs();
-//   console.log("Fetch API Successful")
-// } catch (error) {
-//   console.error("Error fetching and saving jobs:", error);
-// }
-
+try {
+  fetchAndSaveJobs();
+  console.log("Fetch API Successful")
+} catch (error) {
+  console.error("Error fetching and saving jobs:", error);
+}
 
 const corsOptions = {
   origin: 'http://localhost:5173', 
@@ -460,7 +458,7 @@ app.post('/forgot-password', async (req, res) => {
     const resetToken = jwt.sign({email: email, id: userId, type: usertype}, process.env.JWT_KEY, { expiresIn: '1h' });
     const resetLink = `http://localhost:5173/reset-password?token=${resetToken}`;
 
-    await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
+    await sendEmail(email, resetToken);
 
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success | Email successfully sent || ${email}@${req.socket.remoteAddress}\n `);
 
@@ -579,7 +577,6 @@ app.use(async function verifyJwt(req, res, next) {
     }
     
   }
-  
 
 });
 

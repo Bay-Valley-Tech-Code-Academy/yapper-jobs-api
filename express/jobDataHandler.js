@@ -41,7 +41,6 @@ const getEmploymentTypeDescription = (employmentType) => {
   }
 };
 
-
 const insertJobsIntoDatabase = async (jobData) => {
   try {
     const predefinedQuestions = [
