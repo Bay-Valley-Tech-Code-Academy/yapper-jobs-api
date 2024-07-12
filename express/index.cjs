@@ -1711,34 +1711,6 @@ app.delete('/job/delete', async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //fetch user from seeker table
 app.get("/seeker", async (req, res) => {
   const seeker_id = req.user.user_id;
