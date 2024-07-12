@@ -163,11 +163,11 @@ app.post('/register/seeker', async (req, res) => {
         writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/seeker | success: job seeker added | | ${email}@${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
-        console.warn(err);
+        console.error(err);
         writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
@@ -259,11 +259,11 @@ app.post('/register/employer', async (req, res) => {
         writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
-        console.warn(err);
+        console.error(err);
         writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
@@ -312,7 +312,7 @@ app.post('/login/seeker', async (req, res) => {
     });
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
@@ -360,7 +360,7 @@ app.post('/login/employer', async (req, res) => {
       jwt: users.jwt});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
@@ -529,7 +529,7 @@ app.get('/job/search/get', async (req, res) => {
     res.status(200).json({success: true, jobs: jobs});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/search/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
@@ -582,7 +582,7 @@ app.get('/job/:job_id/get', async (req, res) => {
     res.status(200).json({success: true, job: job});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/${job_id}/get | success: got job ${job_id} | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/${job_id}/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
@@ -641,7 +641,7 @@ app.post('/forgot-password', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /forget-password | error: ${err} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
@@ -689,7 +689,7 @@ app.put('/reset-password', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
-    console.warn(err);
+    console.error(err);
 
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
@@ -745,7 +745,7 @@ app.use(async function verifyJwt(req, res, next) {
       }
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: JWT | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
@@ -877,7 +877,7 @@ app.post('/job/add', async (req, res) => {
       throw({status: 500, error: 'failed job add', reason: err.message})
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1128,7 +1128,7 @@ app.post('/resume/add', async (req, res) => {
     writer.write(`${setTimestamp(newTime)} | status: 201 | source: /resume/add | success: ${req.user.email} added/updated resume | | @${req.socket.remoteAddress}\n`);
     res.status(201).json({success: true, message: "resume info added"});
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1206,11 +1206,11 @@ app.get('/resume', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
-      console.warn(err);
+      console.error(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1320,11 +1320,11 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/apply | success: application added | | @${req.socket.remoteAddress}\n`);
       res.status(201).json({success: true, message: 'application submitted'})
     } catch (err) {
-      console.warn(err);
+      console.error(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1366,11 +1366,11 @@ app.get('/job/applied', async (req, res) => {
       //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applied | success: get attempt: jobs applied | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
-      console.warn(err);
+      console.error(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applied | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1429,11 +1429,11 @@ app.get('/job/applications', async (req, res) => {
       //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
-      console.warn(err);
+      console.error(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1572,11 +1572,11 @@ app.get('/job/applications/resume', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(resume)
     } catch (err) {
-      console.warn(err);
+      console.error(err);
       throw({status:500, error: err.message, reason: 'MySQL error'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1606,7 +1606,7 @@ app.get('/delete-user', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'delete link sent to email'});
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1654,7 +1654,7 @@ app.delete('/delete', async (req, res) => {
       throw({status: 500, error: err.message, reason: 'deletion failed'});
     }
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1699,7 +1699,7 @@ app.delete('/job/delete', async (req, res) => {
       job_id: job_id
     })
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1839,7 +1839,7 @@ app.get("/saved-jobs", async (req, res) => {
     );
     res.status(200).json(rows);
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
@@ -1876,7 +1876,7 @@ app.delete("/saved-jobs/:jobId", async (req, res) => {
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /saved-jobs/${jobId} | success: deleted saved job | | ${req.user.email}@${req.socket.remoteAddress}\n`);
     res.status(200).json({ message: "Job removed successfully" });
   } catch (err) {
-    console.warn(err);
+    console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
       writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs/${jobId} | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
