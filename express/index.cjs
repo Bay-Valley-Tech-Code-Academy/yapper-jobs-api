@@ -392,7 +392,7 @@ app.get('/job/search/get', async (req, res) => {
     const start_index = parseInt(req.query.startIndex);
     const per_page = parseInt(req.query.perPage);
     const args = {start_index: start_index, per_page: per_page};
-    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type FROM Job WHERE (job_id >= :start_index';
+    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type FROM Job WHERE (delete_flag = 0 AND job_id >= :start_index';
     if(remote === true) {
       search_query += ' AND remote = 1';
     } else if(location !== null) {
@@ -573,7 +573,7 @@ app.get('/job/:job_id/get', async (req, res) => {
         throw({status: 500, error: 'failed job get', reason: 'search defaulted'});
     }
     const [[job]] = await req.db.query(`
-      SELECT title, company, city, state, ,, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      SELECT title, company, city, state, remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
       FROM Job,
       WHERE job_id = :job_id;
     `,{

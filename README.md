@@ -6,9 +6,9 @@
   `<JSON>` expect no nesting unless otherwise (noted)
 
 ## Endpoint: post /register/seeker
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
       {
         firstName: <String>,
@@ -17,7 +17,7 @@
         email: <String>
       }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -33,9 +33,9 @@
     }
 
 ## Endpoint: post /register/employer
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
     {
       firstName: <String>,
@@ -48,7 +48,7 @@
       industry: <String>
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -65,16 +65,16 @@
     }
 
 ## Endpoint: post /login/seeker
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
     {
       email: <String>,
       pass: <String>
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -90,16 +90,16 @@
     }
 
 ## Endpoint: post /login/employer
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
     {
       email: <String>,
       pass: <String>
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -115,12 +115,12 @@
       error: <String>
     }
 
-## Endpoint: post /job/:job_id/get
-   Params: :job_id
+## Endpoint: get /job/:job_id/get
+  Params: :job_id
 
-   Expects: none
+  Expects: none
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -153,9 +153,9 @@
     }
 
 ## Endpoint: post /job/add
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
     {
       title: <String>,
@@ -174,7 +174,7 @@
       expDate: <Date || null>
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -187,9 +187,9 @@
     }
 
 ## Endpoint: post /resume/add
-   Params: none
+  Params: none
 
-   Expects:
+  Expects:
 
     {
       summary: <String(600)>,
@@ -239,7 +239,7 @@
       } || null>
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -252,13 +252,13 @@
     }
 
 ## Endpoint: /forgot-password
-Expects: 
+  Expects: 
 
     {
       "email": <String>
     }
 
-Responses: 
+  Responses: 
 
     {
       "success": true,
@@ -291,13 +291,12 @@ Responses:
       "error": "Server failure"
     }
   
-=========
 ## Endpoint: get /resume
-   Params: none
+  Params: none
 
-   Expects: none
+  Expects: none
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -320,15 +319,15 @@ Responses:
     }
 
 ## Endpoint: post /job/apply/:job_id/submit
-   Params: :job_id
+  Params: :job_id
 
-   Expects:
+  Expects:
 
     {
       answers: <JSON{Strings} || null>  //max 15
     }
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -341,11 +340,11 @@ Responses:
     }
 
 ## Endpoint: get /job/applied
-   Params: none
+  Params: none
 
-   Expects: none
+  Expects: none
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -361,11 +360,13 @@ Responses:
     }
 
 ## Endpoint: get /job/applications
-   Params: none
+  Query:
+  startIndex: job id of first result on page
+  perPage:    number of results to return
 
-   Expects: none
+  Expects: none
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -378,11 +379,12 @@ Responses:
     }
 
 ## Endpoint: get /job/applications/resume
-   Query: email: seeker email
+  Query:
+  email: seeker email
 
-   Expects: none
+  Expects: none
 
-   Responses:
+  Responses:
 
     {
       success: true,
@@ -402,6 +404,70 @@ Responses:
       skill: <JSON array || null>,
       link: <JSON array || null>,
       publication: <JSON array || null>
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: get /job/search/get
+  Query: 
+  startIndex: job id of first result on page
+  perPage:    number of results to return
+  [key: keywords for keyword search]
+  [loc: location of form city-state]
+  [rem: show remote positions, boolean]
+  [ind: industry]
+  [exp: experience level]
+  [emp: employment type]
+  [size: company size]
+  [sal: salary range, accepts forms low low-high and -high]
+  [ben: benefits]
+  [cert: required certifications]
+
+  Expects: none
+
+  Responses:
+
+    {
+      success: true,
+      jobs: <array> // can return null
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: get /delete-user
+  Params: none
+
+  Expects: none
+
+  Responses:
+
+    {
+      success: true,
+      message: 'delete link sent to email'
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: delete /delete
+  Query:
+  token: JWT sent to email in /delete-user
+
+  Expects: none
+
+  Responses:
+
+    {
+      success: true,
+      message: 'delete link sent to email'
     }
 
     {
