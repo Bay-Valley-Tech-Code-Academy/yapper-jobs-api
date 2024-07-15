@@ -475,6 +475,24 @@ Responses:
       error: <String>
     }
 
+## Endpoint: delete /job/delete
+  Query:
+  id: id of job to be deleted
+
+  Expects: none
+
+  Responses:
+
+    {
+      success: true,
+      message: 'job deleted'
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
 # API Examples
   ## Multiple Entries for Endpoint: /resume/add
   

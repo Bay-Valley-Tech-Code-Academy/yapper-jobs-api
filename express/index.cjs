@@ -1697,7 +1697,9 @@ app.delete('/job/delete', async (req, res) => {
       WHERE job_id = UNHEX(:job_id);
     `,{
       job_id: job_id
-    })
+    });
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/delete | success: job ${job_id} deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+    res.status(200).json({success: true, message: 'job deleted'});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
