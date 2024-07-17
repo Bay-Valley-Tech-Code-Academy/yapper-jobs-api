@@ -5,11 +5,19 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const { rateLimit } = require('express-rate-limit')
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');const { title } = require('process');const { sendEmail } = require('./Email.js');
+const { rateLimit } = require('express-rate-limit');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates, validAN} = require('./helper.js');
+const { title } = require('process');
+const { application } = require('express');
+const { query } = require('express');
 require('dotenv').config();
 const { fetchAndSaveJobs } = require('./jobDataHandler.js');
 
+const corsOptions = {
+  origin: 'http://localhost:5173', 
+  credentials: true,
+  optionSuccessStatus: 200,
+}
 // Call fetchAndSaveJobs function to fetch and save job data
 //Comment this code block out to avoid fetching data from the API each time you run server
 try {
@@ -23,11 +31,6 @@ const corsOptions = {
   origin: 'http://localhost:5173', 
   credentials: true,
   optionSuccessStatus: 200,
-}
-
-// for testing
-function bob(msg) {
-  console.log(msg);
 }
 
 const time = new Date(Date.now());// used to log server start
@@ -191,8 +194,8 @@ app.post('/register/employer', async (req, res) => {
     website,
     industry
   } = req.body;
+  writer.write(`${setTimestamp(newTime)} | | source: /register/employer | info: registration attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(
       !firstName ||
       !lastName ||
@@ -217,10 +220,11 @@ app.post('/register/employer', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed employer add', reason: 'invalid input'});
     }
+    let check;
     try {
       check = await checkUser(req, email);
     } catch (err) {
-      throw({status:500, error: err, reason: 'check failed'});
+      throw({status:500, error: err.message, reason: 'check failed'});
     }
     if(check.exists !== false) {
       throw({status: 400, error: 'failed employer add', reason: check.reason});
@@ -252,18 +256,17 @@ app.post('/register/employer', async (req, res) => {
           company: users.company,
           jwt: users.jwt
         });
-        console.log('USER', user);
-        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | @${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
         console.warn(err);
-        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer bcrypt\.then | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
@@ -279,40 +282,43 @@ app.post('/login/seeker', async (req, res) => {
   const newTime = new Date(Date.now());
   writer.write(`${setTimestamp(newTime)} | login attempt: seeker\n`);
   const {email, pass} = req.body;
+  writer.write(`${setTimestamp(newTime)} | | source: /login/seeker | info: login attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(!email || !pass) {
       throw({status: 400, error: 'failed seeker login', reason: 'missing field'});
     }
     if(!validSAN(email) || !validSAN(pass)) {
       throw({status: 400, error: 'failed seeker login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
+    let check;
+    try {
+      check = await checkUser(req, email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
     if(check.exists === false) {
       throw({status: 400, error: 'failed seeker login', reason: 'user not found'});
     }
     const users = await login(req, email, pass, 'seeker');
     if(users.status) {
-      throw({status: users.status, error: users.error, reason: users.reason})
+      throw({status: users.status, error: users.error, reason: users.reason});
     }
-    res.status(200)
-    .json({
-    success: true, 
-    firstName: users.first_name,
-    lastName: users.last_name,
-    email: users.email,
-    jwt: users.jwt
-    });
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
+    res.status(200).json({
+      success: true,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      jwt: users.jwt});
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/seeker | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/seeker | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/seeker | error: ${err.error} | | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -324,8 +330,8 @@ app.post('/login/employer', async (req, res) => {
   const newTime = new Date(Date.now());
   writer.write(`${setTimestamp(newTime)} | login attempt: employer\n`);
   const {email, pass} = req.body;
+  writer.write(`${setTimestamp(newTime)} | | source: /login/employer | info: login attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    let check;
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
     }
@@ -335,13 +341,18 @@ app.post('/login/employer', async (req, res) => {
     ) {
       throw({status: 400, error: 'failed employer login', reason: 'invalid input'});
     }
-    check = await checkUser(req, email);
-    if(check.exists == false) {
+    let check;
+    try {
+      check = await checkUser(req, email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
       throw({status: 400, error: 'failed employer login', reason: 'user not found'});
     }
     const users = await login(req, email, pass, 'employer');
     if(users.status) {
-      throw({status: users.status, error: users.error, reason: users.reason})
+      throw({status: users.status, error: users.error, reason: users.reason});
     }
     res.status(200).json({
       success: true,
@@ -350,16 +361,180 @@ app.post('/login/employer', async (req, res) => {
       email: users.email,
       company: users.company,
       jwt: users.jwt});
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.warn(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+// job search
+app.get('/job/search/get', async (req, res) => {
+  console.log('get attempt: jobs');
+  const newTime = new Date(Date.now());
+  //const search_type = req.query.type;
+  const keywords = !req.query.key ? null : req.query.key;
+  const location = !req.query.loc ? null : req.query.loc;
+  const remote = req.query.rem !== 'true' ? false : true;
+  const industry = !req.query.ind ? null : req.query.ind;
+  const experience_level = !req.query.exp ? null : req.query.exp;
+  const employment_type = !req.query.emp ? null : req.query.emp;
+  const company_size = !req.query.size ? null : req.query.size;
+  const salary_range = !req.query.sal ? null : req.query.sal;
+  const benefits = !req.query.ben ? null : req.query.ben;
+  const certifications = !req.query.cert ? null : req.query.cert;
+  writer.write(`${setTimestamp(newTime)} | | source: /job/search/get | info: get attempt: jobs | | attempt: @${req.socket.remoteAddress}\n`);
+  try {
+    const start_index = parseInt(req.query.startIndex);
+    const per_page = parseInt(req.query.perPage);
+    const args = {start_index: start_index, per_page: per_page};
+    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type FROM Job WHERE (job_id >= :start_index';
+    if(remote === true) {
+      search_query += ' AND remote = 1';
+    } else if(location !== null) {
+      if(!validSAN(location)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid location'});
+      }
+      search_query += ' AND city = :city AND state = :state';
+      const loc = location.split('-');// separate city and state
+      args.city = loc[0];
+      args.state = loc[1];
+    }
+    if(industry !== null) {
+      if(!validSAN(industry)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid industry'});
+      }
+      search_query += ' AND industry = :industry';
+      args.industry = industry;
+    }
+    if(experience_level !== null) {
+      if(!validSAN(experience_level)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid experience level'});
+      }
+      search_query += ' AND experience_level = :experience_level';
+      args.experience_level = experience_level;
+    }
+    if(employment_type !== null) {
+      if(!validSAN(employment_type)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid employment type'});
+      }
+      search_query += ' AND employment_type = :employment_type';
+      args.employment_type = employment_type;
+    }
+    if(company_size !== null) {
+      if(!validSAN(company_size)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid company size'});
+      }
+      search_query += ' AND company_size = :company_size';
+      args.company_size = company_size;
+    }
+    if(salary_range !== null) {
+      let low = 1;
+      let high = 999999;
+      if(salary_range.indexOf('-') !== -1) {
+        const sal = salary_range.split('-');// separate lowest and highest salary desired
+        if(sal[0] !== '') {
+          args.low = parseInt(sal[0]);
+          search_query += ' AND salary_low >= :low';
+        }
+        args.high = parseInt(sal[1]);
+        search_query += ' AND salary_high <= :high';
+      } else {
+        low = parseInt(salary_range);
+        search_query += ' AND salary_low >= :low';
+      }
+      if(!validN(low) || !validN(high)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'salary out of range'});
+      }
+    }
+    if(benefits !== null) {
+      if(!validSAN(benefits)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid benefits'});
+      }
+      if(benefits.indexOf('-') !== -1) {
+        const ben = benefits.split('-');
+        for(let i = 0; i < ben.length; i++) {
+          search_query += ` AND locate(:ben${i}, JSON_EXTRACT(job.benefits, "$[*]")) > 0`;
+          args['ben' + i] = ben[i];
+        }
+      } else {
+        search_query += ' AND locate(:benefits, JSON_EXTRACT(job.benefits, "$[*]")) > 0';
+        args.benefits = benefits;
+      }
+    }
+    if(certifications !== null) {
+      if(!validSAN(certifications)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid certifications'});
+      }
+      if(certifications.indexOf('-') !== -1) {
+        const cert = certifications.split('-');
+        for(let i = 0; i < cert.length; i++) {
+          search_query += ` AND locate(:cert${i}, JSON_EXTRACT(job.certifications, "$[*]")) > 0`;
+          args['cert' + i] = cert[i];
+        }
+      } else {
+        search_query += ' AND locate(:certifications, JSON_EXTRACT(job.certifications, "$[*]")) > 0';
+        args.certifications = certifications;
+      }
+    }
+    if(keywords !== null) {
+      let querystr = '';
+      if(keywords.indexOf(';') !== -1 || keywords.indexOf('/') !== -1 || keywords.indexOf('\\') !== -1) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+      }
+      if(keywords.indexOf('"') !== -1) {
+        let substr = [];
+        const substrquote = keywords.split('"');
+        for(let i = 0; i < substrquote.length; i++) {
+          if(!validSAN(substrquote[i]) && substrquote[i]) {
+            throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+          }
+          if(substrquote[i] === '') continue;
+          if(i % 2 === 0) {
+            if(substrquote[i].indexOf(' ') !== -1) {
+              substr = substr.concat(substrquote[i].split(' '));
+            }
+          } else {
+            const temp = '+"' + substrquote[i] + '"';
+            substr.push(temp);
+          }
+        }
+        for(let i = 0; i < substr.length; i++) {
+          if(substr[i].length === 0) continue;
+          if(!(i + 1 >= substr.length)) {
+            substr[i] += ' ';
+          }
+          querystr += substr[i]
+        }
+      } else {
+        if(!validSAN(keywords) && keywords === undefined) {
+          throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
+        }
+        querystr = keywords;
+      }
+      search_query += ' AND MATCH (title, job_description, company, industry, experience_level, employment_type) AGAINST (:keyword IN BOOLEAN MODE)';
+      args.keywords = querystr;
+    }
+    search_query += ') LIMIT :per_page;';
+    const [jobs] = await req.db.query(search_query, args);
+    res.status(200).json({success: true, jobs: jobs});
+    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.warn(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/search/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/search/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -415,7 +590,7 @@ app.get('/job/:job_id/get', async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
-})
+});
 
 //fetch jobs table from database
 app.get("/api/jobs", async (req, res) => {
@@ -575,9 +750,7 @@ app.use(async function verifyJwt(req, res, next) {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
     }
-    
   }
-
 });
 
 // Add new job endpoint
@@ -656,7 +829,6 @@ app.post('/job/add', async (req, res) => {
       `,{
         user_id: req.user.user_id
       });
-
       const job = await req.db.query(`
         INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
         VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
@@ -1047,7 +1219,6 @@ app.get('/resume', async (req, res) => {
   }
 });
 
-
 app.post('/job/apply/:job_id/submit', async (req, res) => {
   console.log('add attempt: application');
   const newTime = new Date(Date.now());// for logging
@@ -1161,7 +1332,7 @@ app.get('/job/applied', async (req, res) => {
     }
     try {
       const [apps] = await req.db.query(`
-        SELECT title, date_applied, questions, answers
+        SELECT title, date_applied, questions, answers, seen, accepted, rejected
         FROM Application INNER JOIN Job
         ON Job.job_id = Application.job_id
         WHERE (Application.seeker_id = UNHEX(:user_id) AND Job.delete_flag = 0)
@@ -1195,7 +1366,12 @@ app.get('/job/applications', async (req, res) => {
   console.log('Get attempt: applications');
   const newTime = new Date(Date.now());// for logging
   writer.write(`${setTimestamp(newTime)} | | source: /job/applications | info: get attempt: applications | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  const start_index = parseInt(req.query.startIndex);
+  const per_page = parseInt(req.query.perPage);
   try{
+    if(!validN(start_index) || !validN(per_page)) {
+      throw({status:400, error: 'failed applications get', reason: 'invalid query'});
+    }
     let check;
     try {
       check = await checkUser(req, req.user.email);
@@ -1216,14 +1392,16 @@ app.get('/job/applications', async (req, res) => {
     }
     try {
       const [apps] = await req.db.query(`
-        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, title, first_name, last_name, accepted, rejected
+        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, app_index, title, first_name, last_name, seen, accepted, rejected
         FROM Application INNER JOIN (Seeker, Job)
         ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
-        WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0)
+        WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0 AND app_index > :start_index)
         ORDER BY date_applied DESC
-        LIMIT 2500;
+        LIMIT :per_page;
       `, {
         company: req.user.company,
+        start_index: start_index,
+        per_page: per_page,
       });
       console.log(apps)
       const response = {success: true};
@@ -1251,8 +1429,12 @@ app.get('/job/applications/resume', async (req, res) => {
   console.log('Get attempt: applicant resume');
   const newTime = new Date(Date.now());// for logging
   const resumeEmail = req.query.email;
+  const app_index = parseInt(req.query.appIndex);
   writer.write(`${setTimestamp(newTime)} | | source: /job/applications/resume | info: get attempt: applicant resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
+    if(!validSAN(resumeEmail) || !validN(app_index)) {
+      throw({status:400, error: 'failed applicant resume get', reason: 'invalid query'});
+    }
     let check;
     try {
       check = await checkUser(req, req.user.email);
@@ -1360,6 +1542,13 @@ app.get('/job/applications/resume', async (req, res) => {
       } else {
         throw({message: "null where field set to default false"})
       }
+      await req.db.query(`
+        UPDATE Application
+        SET Seen = 1
+        WHERE app_index = :app_index;
+      `,{
+        app_index: app_index,
+      })
       writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(resume)
     } catch (err) {

@@ -7,10 +7,19 @@ const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for a
 // Two letter abbreviation for states, Puerto Rico, and D.C.
 const TLAbbr = ["AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "PR", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"]
 
+let it = 0;
 
 // for testing
 function bob(msg) {
-  console.log(msg);
+  if(!msg) {
+    console.log(it);
+    it++;
+  } else if (msg === 'reset') {
+    console.log('resetting count');
+    it = 0;
+  } else {
+    console.log(msg);
+  }
 }
 
 function setTimestamp (timeUpdate) {
@@ -55,7 +64,7 @@ function validJSON (check) {
     return valid;
   } catch (err) {
     console.warn(err);
-    writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+    writer.write(`${setTimestamp(newTime)} | | source: helper validJSON | error: ${err.message} | | server\n`);
     return false;
   }
 }
@@ -67,9 +76,9 @@ module.exports = {
     try {
       const [[check]] = await req.db.query(`
       SELECT CASE 
-        WHEN EXISTS(SELECT 1 FROM Employer WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Employer WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Employer WHERE (email = :email AND delete_flag = 0))
-        WHEN EXISTS(SELECT 1 FROM Seeker WHERE email = :email)
+        WHEN EXISTS(SELECT 1 FROM Seeker WHERE (email = :email AND delete_flag = 0))
           THEN (SELECT delete_flag FROM Seeker WHERE (email = :email AND delete_flag = 0))
         ELSE NULL
       END AS checked,
@@ -90,20 +99,18 @@ module.exports = {
       `,{
         email: email
       });
-
       switch (check.checked) {// query return logic
         case 0:
           return {exists: true, reason: 'email already registered', usertype: check.usertype, userId: check.user_id};
         case 1:
-          return {exists: false, reason: null};
         case null:
-          return {exists: false, reason: null};
+          return {exists: false, reason: 'user not found'};
         default:
-          throw('unexpected value returned while searching');
+          throw({message: 'unexpected value returned while searching'});
       }
     } catch(err) {
         console.warn(err);
-        writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+        writer.write(`${setTimestamp(newTime)} | | source: helper.checkUser | error: ${err.message} | | server\n`);
         return err;
     }
   },
@@ -124,7 +131,7 @@ module.exports = {
       }
     } catch (err) {
       console.log(err.message);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.checkAuth | error: ${err.message} | | server\n`);
       return err;
     }
   },
@@ -219,7 +226,7 @@ module.exports = {
   // numeric
   validN: function (check) {
     if(typeof(check) === 'number') {
-      if(check < 1000000) {
+      if(check < 1000000 && check > 0) {
         return true;
       }
     }
@@ -273,7 +280,7 @@ module.exports = {
   // json
   validJSON: function (check) {
     const newTime = new Date(Date.now());
-    if(check === null) return true;
+    if(check === null || check === undefined) return true;
     if(typeof(check) !== 'object') return false;
     try{
       const arr = Object.values(check);
@@ -288,7 +295,7 @@ module.exports = {
       return valid;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validJSON | error: ${err} | | server\n`);
       return false;
     }
   },
@@ -308,7 +315,7 @@ module.exports = {
       return newCheck < newMax ? true : false;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validDate | error: ${err} | | server\n`);
       return false;
     }
   },
@@ -332,7 +339,7 @@ module.exports = {
         day2 = iPar(arr2[2]);
       }
       if(year <= year2) {
-        if(month <= month2) {
+        if(month <= month2 || year < year2) {
           if(arr[2] && arr2[2] && year === year2 && month === month2) {
             if(day > day2) return false;
           }
@@ -342,7 +349,7 @@ module.exports = {
       return false;
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validDates | error: ${err} | | internal\n`);
       return false;
     }
   },
@@ -368,7 +375,7 @@ module.exports = {
       };
     } catch (err) {
       console.warn(err);
-      writer.write(`${setTimestamp(newTime)} | error: ${err}\n`);
+      writer.write(`${setTimestamp(newTime)} | | source: helper.validExpDate | error: ${err} | | server\n`);
       return {valid: false};
     }
   },
