@@ -49,7 +49,7 @@ function validSAN (check, len) {
 
 function validJSON (check) {
   const newTime = new Date(Date.now());
-  if(check === undefined || check === null) return true;
+  if(check === null || check === undefined) return true;
   if(typeof(check) !== 'object') return false;
   try{
     const arr = Object.values(check);

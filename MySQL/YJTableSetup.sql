@@ -23,7 +23,7 @@ CREATE TABLE Job (
 	company VARCHAR(255) NOT NULL,
 	city VARCHAR(255),
 	state VARCHAR(2),
-    is_remote BOOLEAN NOT NULL DEFAULT 0,
+  is_remote BOOLEAN NOT NULL DEFAULT 0,
 	industry VARCHAR(255),
 	website TEXT,
 	experience_level VARCHAR(255),
@@ -38,7 +38,7 @@ CREATE TABLE Job (
 	delete_flag BOOLEAN NOT NULL DEFAULT 0,
 	date_created DATETIME,
 	expires BOOLEAN,
-    date_expires DATETIME,
+  date_expires DATETIME,
 	employer_id BINARY(16),
 	PRIMARY KEY (job_id),
 	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
@@ -56,8 +56,8 @@ CREATE TABLE Seeker (
 	link_entries TINYINT NOT NULL DEFAULT 0,
 	publication_entries TINYINT NOT NULL DEFAULT 0,
 	summary TEXT(640),
-    resume_uploaded BOOLEAN DEFAULT FALSE,
-    resume_url TEXT(2080) DEFAULT NULL,
+  resume_uploaded BOOLEAN DEFAULT FALSE,
+  resume_url TEXT(2080) DEFAULT NULL,
 	delete_flag BOOLEAN NOT NULL DEFAULT 0
 );
 
@@ -113,12 +113,12 @@ CREATE TABLE Publication (
 CREATE TABLE Application (
 	seeker_id BINARY(16) NOT NULL,
 	job_id INT UNSIGNED NOT NULL,
-    app_index INT UNSIGNED AUTO_INCREMENT UNIQUE KEY,
+  app_index INT UNSIGNED AUTO_INCREMENT UNIQUE KEY,
 	answers JSON,
 	date_applied DATETIME DEFAULT CURRENT_TIMESTAMP,
-    seen BOOLEAN DEFAULT FALSE,
-    accepted BOOLEAN DEFAULT FALSE,
-    rejected BOOLEAN DEFAULT FALSE,
+  seen BOOLEAN DEFAULT FALSE,
+  accepted BOOLEAN DEFAULT FALSE,
+  rejected BOOLEAN DEFAULT FALSE,
 	FOREIGN KEY (seeker_id) REFERENCES Seeker(seeker_id),
 	FOREIGN KEY (job_id) REFERENCES Job(job_id)
 );
@@ -148,13 +148,11 @@ VALUE(UNHEX('00000000000000000000000000000001'), 1, null);
 # undo with UNHEX()
 #
 #
-#
-#
 # how to width numbers:
 # SELECT LPAD(<column>, <width>, 0) FROM <table>;
 #
 # For date comparison
-# select DATEDIFF(tests, test2) as bob, test2 from test;
+# SELECT EXTRACT(year_month  FROM '2019-07-02 01:02:03');
 #
 # For date display
-# SELECT DATE_FORMAT([date], '%Y-%m-%d');
+# SELECT DATE_FORMAT('2009-10-04 22:23:00', '%Y-%m');

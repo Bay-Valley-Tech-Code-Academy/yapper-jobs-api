@@ -251,46 +251,123 @@
       error: <String>
     }
 
-## Endpoint: /forgot-password
-Expects: 
+## Endpoint: get /resume
+   Params: none
+
+   Expects: none
+
+   Responses:
 
     {
-      "email": <String>
-    }
-
-Responses: 
-
-    {
-      "success": true,
-      "message": "Reset link sent to email",
-      "token": <String>
-    }
-
-    {
-      "success": false,
-      "error": "Server failure"
-    }
-
-## Endpoint: /reset-password:
-Expects:
-
-    {
-      "newPassword": <String>,
-      "token": <String>
-    }
-
-Responses: 
-
-    {
-      "success": true,
-      "message": "Password reset successful"
+      success: true,
+      seeker: <JSON{
+        first_name: <String>,
+        last_name: <String>,
+        email: <String>,
+        summary: <String(600)>
+      },
+      education: <JSON array || null>,
+      experience: <JSON array || null>,
+      skill: <JSON array || null>,
+      link: <JSON array || null>,
+      publication: <JSON array || null>
     }
 
     {
-      "success": false,
-      "error": "Server failure"
+      success: false,
+      error: <String>
     }
-  
+
+## Endpoint: post /job/apply/:job_id/submit
+   Params: :job_id
+
+   Expects:
+
+    {
+      answers: <JSON{Strings} || null>  //max 15
+    }
+
+   Responses:
+
+    {
+      success: true,
+      message: 'application submitted'
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: get /job/applied
+   Params: none
+
+   Expects: none
+
+   Responses:
+
+    {
+      success: true,
+      title: <String>,
+      date_applied: <Date>,
+      questions: <JSON>,
+      answers: <JSON>
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: get /job/applications
+   Params: none
+
+   Expects: none
+
+   Responses:
+
+    {
+      success: true,
+      apps: <JSON array(2500)>
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
+## Endpoint: get /job/applications/resume
+   Query: email: seeker email
+
+   Expects: none
+
+   Responses:
+
+    {
+      success: true,
+      resume_url: <String(2048)>
+    }
+
+    {
+      success: true,
+      seeker: <JSON{
+        first_name: <String>,
+        last_name: <String>,
+        email: <String>,
+        summary: <String(600)>
+      }>,
+      education: <JSON array || null>,
+      experience: <JSON array || null>,
+      skill: <JSON array || null>,
+      link: <JSON array || null>,
+      publication: <JSON array || null>
+    }
+
+    {
+      success: false,
+      error: <String>
+    }
+
 # API Examples
   ## Multiple Entries for Endpoint: /resume/add
   
