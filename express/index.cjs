@@ -759,7 +759,59 @@ app.use(async function verifyJwt(req, res, next) {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
     }
-    
+  }
+});
+
+app.get('/jwt-log', async (req, res) => {
+  const email = req.user.email;
+  try {
+    let check;
+    try {
+      check = await checkUser(req, email);
+    } catch (err) {
+      throw({status:500, error: err.message, reason: 'check failed'});
+    }
+    if(check.exists === false) {
+      throw({status: 404, error: 'failed login', reason: check.reason});
+    }
+    let users;
+    if(check.usertype == 'seeker'){
+      const [[response]] = await req.db.query(`
+        SELECT first_name, last_name, email FROM Seeker
+          WHERE (email = :email AND delete_flag = 0);`,
+        {email: email}
+      );
+      users = response;
+    } else if (check.usertype == 'employer'){
+      const [[response]] = await req.db.query(`
+        SELECT first_name, last_name, email, company FROM Employer
+          WHERE (email = :email AND delete_flag = 0);`,
+        {email: email}
+      );
+      users = response;
+    } else {
+      throw({status: 500, error: 'failed login', reason: 'user logging in'});
+    }
+    if (!users) {
+      throw({status: 500, error: 'failed login', reason: 'user not found'});
+    }
+    res.status(200).json({
+      success: true,
+      firstName: users.first_name,
+      lastName: users.last_name,
+      email: users.email,
+      company: !users.company ? null : users.company
+    });
+  } catch (err) {
+    console.error(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /jwt-log | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /jwt-log | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
+    }
   }
 });
 
