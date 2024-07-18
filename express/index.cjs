@@ -82,6 +82,17 @@ const resumeLimiter = rateLimit({
   }
 });
 
+const applyLimiter = rateLimit({
+  windowMs: 30 * 1000,
+  limit: 2,
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  handler: (req, res, next) => {
+    const newTime = new Date(Date.now());// for logging
+    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /job/apply | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    res.status(429).json({success: false, error: 'Too Many Requests'});
+  }
+});
 
 app.use(cors(corsOptions));
 
@@ -105,7 +116,8 @@ app.use(async (req, res, next) => {
 
 app.use('/login', loginLimiter);
 app.use('/register', registerLimiter);
-//app.use('/resume', resumeLimiter);
+app.use('/resume', resumeLimiter);
+app.use('/job/apply', applyLimiter);
 
 // Register endpoint for job seeker
 app.post('/register/seeker', async (req, res) => {
@@ -484,20 +496,17 @@ app.get('/job/search/get', async (req, res) => {
     if(keywords !== null) {
       let querystr = '';
       if(keywords.indexOf(';') !== -1 || keywords.indexOf('/') !== -1 || keywords.indexOf('\\') !== -1) {
-        bob()
         throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
       }
       if(keywords.indexOf('"') !== -1) {
         let substr = [];
         const substrquote = keywords.split('"');
-        bob(substrquote)
         for(let i = 0; i < substrquote.length; i++) {
           if(!validSAN(substrquote[i]) && substrquote[i]) {
             throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
           }
           if(substrquote[i] === '') continue;
           if(i % 2 === 0) {
-            bob(i)
             if(substrquote[i].indexOf(' ') !== -1) {
               substr = substr.concat(substrquote[i].split(' '));
             }
@@ -523,8 +532,6 @@ app.get('/job/search/get', async (req, res) => {
       args.keywords = querystr;
     }
     search_query += ') LIMIT :per_page;';
-    bob(search_query)
-    bob(args)
     const [jobs] = await req.db.query(search_query, args);
     res.status(200).json({success: true, jobs: jobs});
     writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
@@ -721,11 +728,9 @@ app.use(async function verifyJwt(req, res, next) {
     }
   
     try {
-      bob(1)
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
       writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
-      bob(2)
       await next();
     } catch (err) {
       console.log(err);
