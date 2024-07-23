@@ -68,7 +68,7 @@ const sendApplication = (email, job, seeker) => {
 
 // Function to send employer an email when someone applies
 const sendDelete = (email, token) => {
-  const deleteLink = `http://127.0.0.1:3000/delete?token=${token}`;
+  const deleteLink = `http://127.0.0.1:3000/delete-confirmation?token=${token}`;
 
   const mailOptions = {
     from: '"Yapper Jobs" <yapper-no-reply@gmail.com>',

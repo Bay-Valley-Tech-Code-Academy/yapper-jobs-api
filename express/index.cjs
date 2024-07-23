@@ -773,19 +773,19 @@ app.post('/job/add', async (req, res) => {
   const {
     title,
     city,
-    state,
     isRemote,
     experienceLevel,
     employmentType,
     companySize,
-    salaryLow,
-    salaryHigh,
     benefits,
     certifications,
     jobDescription,
     expDate,
     questions
   } = req.body;
+  salaryLow = parseInt(req.body.salaryLow);
+  salaryHigh = parseInt(req.body.salaryHigh);
+  state = req.body.state.toUpperCase();
   try {
     // check if input exists and is safe
     if(
@@ -798,8 +798,7 @@ app.post('/job/add', async (req, res) => {
       !companySize            ||
       !salaryLow              ||
       !salaryHigh             ||
-      !jobDescription         ||
-      expDate === undefined
+      !jobDescription
     ) {
       throw({status: 400, error: 'failed job add', reason: 'missing field'});
     }
@@ -816,7 +815,6 @@ app.post('/job/add', async (req, res) => {
       !validJSON(certifications)      ||
       !validSAN(jobDescription, 600)  ||
       !validJSON(questions)           ||
-      !validExpDate(expDate).valid    ||
       typeof(isRemote) !== 'boolean'
     ) {
       throw({status: 400, error: 'failed job add', reason: 'invalid input'});
@@ -1768,7 +1766,7 @@ app.get("/employer", async (req, res) => {
   const email = req.user.email;
   writer.write(`${setTimestamp(newTime)} | | source: /employer | info: employer persistence login attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
-    if (!seeker_id) {
+    if (!employer_id) {
       throw {
         status: 400,
         error: "failed to get employer",
@@ -1854,6 +1852,7 @@ app.post("/save-job", async (req, res) => {
 
 //fetch saved jobs from database
 app.get("/saved-jobs", async (req, res) => {
+  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const email = req.user.email;
   writer.write(`${setTimestamp(newTime)} | | source: /saved-jobs | info: get saved jobs attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
@@ -1905,6 +1904,7 @@ app.get("/saved-jobs", async (req, res) => {
 
 //remove job
 app.delete("/saved-jobs/:jobId", async (req, res) => {
+  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const jobId = req.params.jobId;
   writer.write(`${setTimestamp(newTime)} | | source: /saved-jobs/${jobId} | info: delete saved job attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
