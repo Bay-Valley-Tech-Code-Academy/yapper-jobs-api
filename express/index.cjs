@@ -4,9 +4,10 @@ const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const bodyParser = require('body-parser');
+const multer = require('multer');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit');
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates} = require('./helper.js');
+const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates, fileFilter} = require('./helper.js');
 const { title } = require('process');
 const { error } = require('console');
 const { sendEmail, sendApplication, sendDelete } = require('./Email.js');
@@ -1629,7 +1630,7 @@ app.delete('/delete', async (req, res) => {
 
   try {
     const {user_id, type, deleter} = jwt.verify(token, process.env.JWT_KEY);
-    if(deleter !== 'yes please' || !user_id || !validA(type)) {
+    if(deleter !== "yes please" || !user_id || !validA(type)) {
       throw({status: 404, error: 'failed user deletion', reason: 'invalid token'});
     }
     let check;
@@ -1659,11 +1660,11 @@ app.delete('/delete', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1937,6 +1938,10 @@ app.delete("/saved-jobs/:jobId", async (req, res) => {
       writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs/${jobId} | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
+});
+
+app.post('upload-pfp', multer({dest: '../images', fileFilter: fileFilter}).single('file'), async (req, res, next) => {
+  
 });
 
 //add a logout endpoint
