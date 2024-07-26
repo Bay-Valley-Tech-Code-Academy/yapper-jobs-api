@@ -2,6 +2,7 @@ const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const writer = fs.createWriteStream('./ape.log', {flags: 'a'});// open log for appending, creates file if it does not exist
 // Two letter abbreviation for states, Puerto Rico, and D.C.
@@ -221,6 +222,11 @@ module.exports = {
     writer.write(`${setTimestamp(newTime)} | status: ${errOut.status != null ? errOut.status : 500} | source: ${source} | error: ${errOut.error} | reason: ${errOut.reason} | user: ${user}@${address}\n`);
   }
  */
+
+  newTime: function () {
+    return new Date(Date.now());// for logging
+  },
+
   // Human readable timestamp for log
   setTimestamp: function (timeUpdate) {
     const months = (timeUpdate.getMonth() < 10) ? '0' + timeUpdate.getMonth() : timeUpdate.getMonth();
@@ -235,6 +241,7 @@ module.exports = {
   // validate input
   // alpha
   validA: function (check, len) {
+    bob()
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z ]+$/g;
@@ -246,6 +253,7 @@ module.exports = {
 
   // numeric
   validN: function (check) {
+    bob()
     if(typeof(check) === 'number') {
       if(check < 1000000 && check > 0) {
         return true;
@@ -256,6 +264,7 @@ module.exports = {
 
   // alphanumeric
   validAN: function (check, len) {
+    bob()
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z 0-9]+$/g;
@@ -267,6 +276,7 @@ module.exports = {
   
   // special characters + alphanumeric
   validSA: function (check, len) {
+    bob()
     if(typeof(check) === 'string') {
       if(check.length < 3 || check.length > len) return false;
       const pattern = /^[A-Za-z \!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
@@ -278,6 +288,7 @@ module.exports = {
 
   // special characters + alphanumeric
   validSAN: function (check, len) {
+    bob()
     if(typeof(check) === 'string') {
       if(check.length < 1 || check.length > len) return false;
       const pattern = /^[A-Za-z 0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/g;
@@ -289,6 +300,7 @@ module.exports = {
 
   // state
   validState: function (check) {
+    bob()
     if(typeof(check) === 'string') {
       if(check.length === 2) {
         const arr = TLAbbr.filter((state) => state === check);
@@ -300,9 +312,13 @@ module.exports = {
 
   // json
   validJSON: function (check) {
+    bob()
     const newTime = new Date(Date.now());
     if(check === null || check === undefined) return true;
-    if(typeof(check) !== 'object') return false;
+    if(typeof(check) !== 'object' && typeof(check) !== 'array') {
+      console.log(typeof(check))
+      return false;
+    }
     try{
       const arr = Object.values(check);
       const valid = arr.every((entry) => {
@@ -323,6 +339,7 @@ module.exports = {
 
   // date const pattern = /^[A-Za-z0-9\!\@\#\$\%\^\&\*\)\(+\=\._-]+$/
   validDate: function (check) {
+    bob()
     const newTime = new Date(Date.now());
     const pattern = /^[1-2][0-9][0-9][0-9]-[0-1][0-9]+$/;
     if(!pattern.test(check)) return false;
@@ -343,6 +360,7 @@ module.exports = {
 
   // non-paradoxical dates
   validDates: function (check, check2) {
+    bob()
     const newTime = new Date(Date.now());
     try{
       const arr = check.split('-');
@@ -377,6 +395,7 @@ module.exports = {
 
   // expiration date
   validExpDate: function (check) {
+    bob()
     const newTime = new Date(Date.now());
     const pattern = /^2[0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]+$/;
     if(check === null) return {valid: true};
@@ -406,7 +425,12 @@ module.exports = {
     if(file.mimetype === 'image/gif' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
       cb(null, true);
     } else {
-
+      
     }
   },
+
+  // create hash to use as filename
+  filename: function (req, file, cb) {
+    const hash = crypto.createHash('aes-256-cfb')
+  }
 }

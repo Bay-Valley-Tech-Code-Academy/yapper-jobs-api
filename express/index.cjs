@@ -53,8 +53,7 @@ const loginLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req, res, next) => {
-    const newTime = new Date(Date.now());// for logging
-    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /login | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 429 | source: /login | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
@@ -65,8 +64,7 @@ const registerLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req, res, next) => {
-    const newTime = new Date(Date.now());// for logging
-    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /register | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 429 | source: /register | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
@@ -77,8 +75,7 @@ const resumeLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req, res, next) => {
-    const newTime = new Date(Date.now());// for logging
-    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /resume | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 429 | source: /resume | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
@@ -89,8 +86,7 @@ const applyLimiter = rateLimit({
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
 	legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req, res, next) => {
-    const newTime = new Date(Date.now());// for logging
-    writer.write(`${setTimestamp(newTime)} | status: 429 | source: /job/apply | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 429 | source: /job/apply | error: Too Many Requests | | ${req.body.email}@${req.socket.remoteAddress}\n`);
     res.status(429).json({success: false, error: 'Too Many Requests'});
   }
 });
@@ -124,14 +120,13 @@ app.use('/job/apply', applyLimiter);
 app.post('/register/seeker', async (req, res) => {
   console.log('registration attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);// for jwt expiration
-  const newTime = new Date(Date.now());// for logging
   const {
     firstName,
     lastName,
     pass,
     email
   } = req.body;
-  writer.write(`${setTimestamp(newTime)} | | source: /register/seeker | info: Registration attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /register/seeker | info: Registration attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     // check if input exists and is safe
     if(!firstName || !lastName || !pass || !email) {
@@ -173,21 +168,21 @@ app.post('/register/seeker', async (req, res) => {
           email: users.email,
           jwt: users.jwt
         });
-        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/seeker | success: job seeker added | | ${email}@${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime())} | status: 201 | source: /register/seeker | success: job seeker added | | ${email}@${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
         console.error(err);
-        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime())} | status: 500 | source: /register/seeker bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/seeker | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /register/seeker | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/seeker | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /register/seeker | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -196,7 +191,6 @@ app.post('/register/seeker', async (req, res) => {
 app.post('/register/employer', async (req, res) => {
   console.log('Registration attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());
   const {
     firstName,
     lastName,
@@ -207,7 +201,7 @@ app.post('/register/employer', async (req, res) => {
     website,
     industry
   } = req.body;
-  writer.write(`${setTimestamp(newTime)} | | source: /register/employer | info: registration attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /register/employer | info: registration attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if(
       !firstName ||
@@ -269,21 +263,21 @@ app.post('/register/employer', async (req, res) => {
           company: users.company,
           jwt: users.jwt
         });
-        writer.write(`${setTimestamp(newTime)} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | | @${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime())} | status: 201 | source: /register/employer | success: employer ${email} @ ${company} added | | @${req.socket.remoteAddress}\n`);
       } catch (err) {
         res.status(500).json({success: false, error: 'server failure'})
         console.error(err);
-        writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+        writer.write(`${setTimestamp(newTime())} | status: 500 | source: /register/employer bcrypt\.then | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
       }});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /register/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /register/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /register/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -292,9 +286,8 @@ app.post('/register/employer', async (req, res) => {
 app.post('/login/seeker', async (req, res) => {
   console.log('login attempt: seeker');
   const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());
   const {email, pass} = req.body;
-  writer.write(`${setTimestamp(newTime)} | | source: /login/seeker | info: login attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /login/seeker | info: login attempt: seeker | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if(!email || !pass) {
       throw({status: 400, error: 'failed seeker login', reason: 'missing field'});
@@ -323,16 +316,16 @@ app.post('/login/seeker', async (req, res) => {
     email: users.email,
     jwt: users.jwt
     });
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /login/seeker | info: login: seeker ${email} logged in | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /login/seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/seeker | error: ${err.error} | | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /login/seeker | error: ${err.error} | | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -341,9 +334,8 @@ app.post('/login/seeker', async (req, res) => {
 app.post('/login/employer', async (req, res) => {
   console.log('login attempt: employer');
   const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());
   const {email, pass} = req.body;
-  writer.write(`${setTimestamp(newTime)} | | source: /login/employer | info: login attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /login/employer | info: login attempt: employer | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if(!email || !pass) {
       throw({status: 400, error: 'failed employer login', reason: 'missing field'});
@@ -371,16 +363,16 @@ app.post('/login/employer', async (req, res) => {
       email: users.email,
       company: users.company,
       jwt: users.jwt});
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /login/employer | success: ${users.email} @ ${users.company} logged in | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /login/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /login/employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /login/employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -388,7 +380,6 @@ app.post('/login/employer', async (req, res) => {
 // job search
 app.get('/job/search/get', async (req, res) => {
   console.log('get attempt: jobs');
-  const newTime = new Date(Date.now());
   //const search_type = req.query.type;
   const keywords = !req.query.key ? null : req.query.key;
   const location = !req.query.loc ? null : req.query.loc;
@@ -400,7 +391,7 @@ app.get('/job/search/get', async (req, res) => {
   const salary_range = !req.query.sal ? null : req.query.sal;
   const benefits = !req.query.ben ? null : req.query.ben;
   const certifications = !req.query.cert ? null : req.query.cert;
-  writer.write(`${setTimestamp(newTime)} | | source: /job/search/get | info: get attempt: jobs | | attempt: @${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/search/get | info: get attempt: jobs | | attempt: @${req.socket.remoteAddress}\n`);
   try {
     const start_index = parseInt(req.query.startIndex);
     const per_page = parseInt(req.query.perPage);
@@ -535,16 +526,16 @@ app.get('/job/search/get', async (req, res) => {
     search_query += ') LIMIT :per_page;';
     const [jobs] = await req.db.query(search_query, args);
     res.status(200).json({success: true, jobs: jobs});
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/search/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/search/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/search/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/search/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -553,8 +544,7 @@ app.get('/job/search/get', async (req, res) => {
 app.get('/job/:job_id/get', async (req, res) => {
   const job_id = parseInt(req.params.job_id);
   console.log('get attempt: job');
-  const newTime = new Date(Date.now());
-  writer.write(`${setTimestamp(newTime)} | | source: /job/${job_id}/get | info: get attempt: job | | attempt: @${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/${job_id}/get | info: get attempt: job | | attempt: @${req.socket.remoteAddress}\n`);
   try{
     const [[{exist}]] = await req.db.query(`
       SELECT CASE
@@ -588,16 +578,16 @@ app.get('/job/:job_id/get', async (req, res) => {
       job_id: job_id,
     });
     res.status(200).json({success: true, job: job});
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/${job_id}/get | success: got job ${job_id} | | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/${job_id}/get | success: got job ${job_id} | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/${job_id}/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/${job_id}/get | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/${job_id}/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
 })
@@ -615,10 +605,9 @@ app.get("/api/jobs", async (req, res) => {
 
 // forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
-  const newTime = new Date(Date.now());
   const { email } = req.body;
 
-  writer.write(`${setTimestamp(newTime)} || source: /forget-password | info: reset attempt: password || attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} || source: /forget-password | info: reset attempt: password || attempt: ${email}@${req.socket.remoteAddress}\n`);
   
   try {
     if (!email) {
@@ -645,18 +634,18 @@ app.post('/forgot-password', async (req, res) => {
 
     await sendEmail(email, 'Password Reset', `Click here to reset your password: ${resetLink}`);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /forgot-password | success: Email sent | | ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /forgot-password | success: Email sent | | ${email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'Reset link sent to email', token: resetToken });
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /forget-password | error: ${err} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /forget-password | error: ${err} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     } 
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /forget-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /forget-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }   
   }
 });
@@ -664,10 +653,9 @@ app.post('/forgot-password', async (req, res) => {
 // reset password
 app.put('/reset-password', async (req, res) => {
   console.log('reset password attempt')
-  const newTime = new Date(Date.now());
   const { token, newPassword } = req.body;
   let userId, usertype, email;
-  writer.write(`${setTimestamp(newTime)} || source: /reset-password | info: resetting password | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} || source: /reset-password | info: resetting password | | attempt: ${email}@${req.socket.remoteAddress}\n`);
 
   try {
     if (!token || !newPassword) {
@@ -693,7 +681,7 @@ app.put('/reset-password', async (req, res) => {
 
     const result = await req.db.query(query, params);
 
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /reset-password | success: Password successfully reset || ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /reset-password | success: Password successfully reset || ${email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'Password reset successful' });
   } catch (err) {
@@ -701,11 +689,11 @@ app.put('/reset-password', async (req, res) => {
 
     if(!err.reason) {
       res.status(500).json({ success: false, error: 'Server failure' });
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /reset-password | error: ${err} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     } 
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /reset-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /reset-password | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     } 
   }
 });
@@ -713,12 +701,11 @@ app.put('/reset-password', async (req, res) => {
 // JWT verification checks to see if there is an authorization header with a valid JWT in it.
 app.use(async function verifyJwt(req, res, next) {
   console.log('Verify attempt: JWT');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verify attempt: JWT | | attempt: @${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: JWT | info: verify attempt: JWT | | attempt: @${req.socket.remoteAddress}\n`);
   try {
     if (!req.headers.authorization) {
       throw({status: 400, error: 'failed JWT verify', reason: 'invalid authorization, no authorization headers'});
-      // writer.write(`${setTimestamp(newTime)} | Verify attempt: JWT\n`);
+      // writer.write(`${setTimestamp(newTime())} | Verify attempt: JWT\n`);
       // res.status(400).json({error: 'Invalid authorization, no authorization headers'});
     }
   
@@ -731,7 +718,7 @@ app.use(async function verifyJwt(req, res, next) {
     try {
       const payload = jwt.verify(token, process.env.JWT_KEY);
       req.user = payload;
-      writer.write(`${setTimestamp(newTime)} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
+      writer.write(`${setTimestamp(newTime())} | | source: JWT | info: verified: JWT | | ${req.user.email}@${req.socket.remoteAddress}\n`)
       await next();
     } catch (err) {
       console.log(err);
@@ -754,11 +741,11 @@ app.use(async function verifyJwt(req, res, next) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: JWT | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: JWT | error: ${err.message} | | @${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: JWT | error: ${err.error} | reason: ${err.reason} | @${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -767,9 +754,7 @@ app.use(async function verifyJwt(req, res, next) {
 app.post('/job/add', async (req, res) => {
   if(req.user.type != 'employer') throw({status: 403, error: 'failed job add', reason: 'forbidden'});
   console.log('Add attempt: job');
-  const newTimestamp = Math.floor(Date.now() / 1000);
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /job/add | info: add attempt: job | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/add | info: add attempt: job | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   // api body MUST send null object for empty json inputs
   const {
     title,
@@ -778,15 +763,15 @@ app.post('/job/add', async (req, res) => {
     experienceLevel,
     employmentType,
     companySize,
-    benefits,
-    certifications,
     jobDescription,
     expDate,
-    questions
   } = req.body;
-  salaryLow = parseInt(req.body.salaryLow);
-  salaryHigh = parseInt(req.body.salaryHigh);
-  state = req.body.state.toUpperCase();
+  const salaryLow = parseInt(req.body.salaryLow);
+  const salaryHigh = parseInt(req.body.salaryHigh);
+  const state = req.body.state.toUpperCase();
+  const questions = JSON.parse(req.body.questions);
+  const benefits = JSON.parse(req.body.benefits);
+  const certifications = JSON.parse(req.body.certifications);
   try {
     // check if input exists and is safe
     if(
@@ -858,7 +843,7 @@ app.post('/job/add', async (req, res) => {
         job_description: jobDescription,
         questions: !questions ? null : JSON.stringify(questions),
         employer_id: req.user.user_id,
-        date_created: newTime,
+        date_created: newTime(),
         expires: !expDate ? false : true,
         date_expires: !expDate ? null : validExpDate(expDate).expDate,
       });
@@ -875,7 +860,7 @@ app.post('/job/add', async (req, res) => {
         success: true,
         jobId: jobId.job_id
       });
-      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/add | success: ${req.user.email} @ ${req.user.company} added job id: ${jobId.job_id} | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 201 | source: /job/add | success: ${req.user.email} @ ${req.user.company} added job id: ${jobId.job_id} | | @${req.socket.remoteAddress}\n`);
     } catch (err) {
       throw({status: 500, error: 'failed job add', reason: err.message})
     }
@@ -883,11 +868,11 @@ app.post('/job/add', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/add | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/add | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -895,8 +880,7 @@ app.post('/job/add', async (req, res) => {
 // Add resume endpoint
 app.post('/resume/add', async (req, res) => {
   console.log('Add attempt: resume');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /resume/add | info: add attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /resume/add | info: add attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {
     summary,
     education,
@@ -1128,25 +1112,24 @@ app.post('/resume/add', async (req, res) => {
     });
     sqlStrs.push(`UPDATE Seeker\nSET summary = '${summary}', education_entries = ${entries[0]}, experience_entries = ${entries[1]}, skill_entries = ${entries[2]}, link_entries = ${entries[3]}, publication_entries = ${entries[4]}\nWHERE seeker_id = UNHEX("${req.user.user_id}");`);
     sqlStrs.every(async (entry) => await req.db.execute(entry));
-    writer.write(`${setTimestamp(newTime)} | status: 201 | source: /resume/add | success: ${req.user.email} added/updated resume | | @${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 201 | source: /resume/add | success: ${req.user.email} added/updated resume | | @${req.socket.remoteAddress}\n`);
     res.status(201).json({success: true, message: "resume info added"});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /resume/add | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /resume/add | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /resume/add | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 app.get('/resume', async (req, res) => {
   console.log('Get attempt: resume');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /resume | info: get attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /resume | info: get attempt: resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
     let check;
     try {
@@ -1206,7 +1189,7 @@ app.get('/resume', async (req, res) => {
       response.skill = !skill.length ? null : skill;
       response.link = !link.length ? null : link;
       response.publication = !publication.length ? null : publication;
-      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
       console.error(err);
@@ -1216,11 +1199,11 @@ app.get('/resume', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1228,8 +1211,7 @@ app.get('/resume', async (req, res) => {
 
 app.post('/job/apply/:job_id/submit', async (req, res) => {
   console.log('add attempt: application');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/apply | info: add attempt: application | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const {answers} = req.body;
   const job_id = parseInt(req.params.job_id);
   try{
@@ -1320,7 +1302,7 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
         seeker_id: req.user.user_id,
       });
       await sendApplication(email, {title: title}, {first_name: first_name, last_name: last_name});
-      writer.write(`${setTimestamp(newTime)} | status: 201 | source: /job/apply | success: application added | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 201 | source: /job/apply | success: application added | | @${req.socket.remoteAddress}\n`);
       res.status(201).json({success: true, message: 'application submitted'})
     } catch (err) {
       console.error(err);
@@ -1330,19 +1312,18 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 app.get('/job/applied', async (req, res) => {
   console.log('Get attempt: jobs applied');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /job/applied | info: get attempt: jobs applied | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/applied | info: get attempt: jobs applied | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
     let check;
     try {
@@ -1366,7 +1347,7 @@ app.get('/job/applied', async (req, res) => {
       console.log(apps)
       const response = {success: true};
       response.apps = apps;
-      //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applied | success: get attempt: jobs applied | | @${req.socket.remoteAddress}\n`);
+      //writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/applied | success: get attempt: jobs applied | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
       console.error(err);
@@ -1376,19 +1357,18 @@ app.get('/job/applied', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applied | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/applied | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/applied | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/applied | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 app.get('/job/applications', async (req, res) => {
   console.log('Get attempt: applications');
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /job/applications | info: get attempt: applications | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/applications | info: get attempt: applications | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const start_index = parseInt(req.query.startIndex);
   const per_page = parseInt(req.query.perPage);
   try{
@@ -1429,7 +1409,7 @@ app.get('/job/applications', async (req, res) => {
       console.log(apps)
       const response = {success: true};
       response.apps = apps;
-      //writer.write(`${setTimestamp(newTime)} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
+      //writer.write(`${setTimestamp(newTime())} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
       console.error(err);
@@ -1439,21 +1419,20 @@ app.get('/job/applications', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/applications | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/applications | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/applications | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 app.get('/job/applications/resume', async (req, res) => {
   console.log('Get attempt: applicant resume');
-  const newTime = new Date(Date.now());// for logging
   const resumeEmail = req.query.email;
   const app_index = parseInt(req.query.appIndex);
-  writer.write(`${setTimestamp(newTime)} | | source: /job/applications/resume | info: get attempt: applicant resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/applications/resume | info: get attempt: applicant resume | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try{
     if(!validSAN(resumeEmail) || !validN(app_index)) {
       throw({status:400, error: 'failed applicant resume get', reason: 'invalid query'});
@@ -1572,7 +1551,7 @@ app.get('/job/applications/resume', async (req, res) => {
       `,{
         app_index: app_index,
       })
-      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/applications/resume | success: get attempt: applicant resume | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(resume)
     } catch (err) {
       console.error(err);
@@ -1582,11 +1561,11 @@ app.get('/job/applications/resume', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/applications/resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/applications | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/applications | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1594,8 +1573,7 @@ app.get('/job/applications/resume', async (req, res) => {
 app.get('/delete-user', async (req, res) => {
   console.log('Delete request');
   const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /delete-user | info: delete request | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /delete-user | info: delete request | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const payload = {
     user_id: req.user.user_id,
     type: req.user.type,
@@ -1605,27 +1583,25 @@ app.get('/delete-user', async (req, res) => {
   try {
     const token = jwt.sign(payload, process.env.JWT_KEY);
     await sendDelete(req.user.email, token);
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /delete-user | success: email sent | | ${req.user.email}@${req.socket.remoteAddress}\n`);
 
     res.status(200).json({ success: true, message: 'delete link sent to email'});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /delete-user | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /delete-user | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 })
 
 app.delete('/delete', async (req, res) => {
   console.log('Delete request');
-  //const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());// for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /delete | info: delete ${req.user.email} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /delete | info: delete ${req.user.email} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   const token = req.query.token;
 
   try {
@@ -1650,7 +1626,7 @@ app.delete('/delete', async (req, res) => {
       `,{
         user_id: user_id
       });
-      writer.write(`${setTimestamp(newTime)} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 200 | source: /delete | success: user deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
   
       res.status(200).json({ success: true, message: 'deleted user'});
     } catch (err) {
@@ -1660,21 +1636,19 @@ app.delete('/delete', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 app.delete('/job/delete', async (req, res) => {
   console.log('Delete request');
-  //const timeNow = Math.ceil(Date.now() / 1000);
-  const newTime = new Date(Date.now());// for logging
   const job_id = req.query.id;
-  writer.write(`${setTimestamp(newTime)} | | source: /job/delete | info: delete ${job_id} requested | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /job/delete | info: delete ${job_id} requested | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
   try {
     let check;
     try {
@@ -1701,27 +1675,66 @@ app.delete('/job/delete', async (req, res) => {
     `,{
       job_id: job_id
     });
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /job/delete | success: job ${job_id} deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/delete | success: job ${job_id} deleted | | ${req.user.email}@${req.socket.remoteAddress}\n`);
     res.status(200).json({success: true, message: 'job deleted'});
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /job/delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/delete | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /job/delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/delete | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+// fetch user profile
+app.get("/profile", async (req, res) => {
+  const email = req.user.email;
+  const table = req.user.type;
+  const id = req.user.user_id
+  writer.write(`${setTimestamp(newTime())} | | source: /profile | info: get user profile | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  try {
+    let user;
+    if(table == 'seeker') {
+      user = await req.db.query(`
+        SELECT summary
+        FROM Seeker
+        WHERE seeker_id = UNHEX(:id);
+      `,{
+        id: id,
+      });
+    } else {
+      [[user]] = req.db.query(`
+        SELECT industry, company, company_size, website, mobile
+        FROM Employer
+        WHERE employer_id = UNHEX(:id);
+      `, {
+        id: id,
+      });
+    }
+    res.status(200).json(user);
+    writer.write(`${setTimestamp(newTime())} | | source: /profile | info: get user profile | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.error(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /profile | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /profile | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 //fetch user from seeker table
 app.get("/seeker", async (req, res) => {
-  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const email = req.user.email;
-  writer.write(`${setTimestamp(newTime)} | | source: /seeker | info: seeker persistence login attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /seeker | info: seeker persistence login attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try{
     if (!seeker_id) {
       throw {
@@ -1745,27 +1758,26 @@ app.get("/seeker", async (req, res) => {
         seeker_id: seeker_id,
       }
     );
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /seeker | success: seeker info returned | | ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /seeker | success: seeker info returned | | ${email}@${req.socket.remoteAddress}\n`);
     res.status(200).json(seeker[0]);
   }  catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /seeker | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /seeker | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /seeker | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 //fetch user from employer table
 app.get("/employer", async (req, res) => {
-  const newTime = new Date(Date.now());// for logging
   const employer_id = req.user.user_id;
   const email = req.user.email;
-  writer.write(`${setTimestamp(newTime)} | | source: /employer | info: employer persistence login attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /employer | info: employer persistence login attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if (!employer_id) {
       throw {
@@ -1789,17 +1801,17 @@ app.get("/employer", async (req, res) => {
         employer_id: employer_id,
       }
     );
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /employer | success: employer info returned | | ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /employer | success: employer info returned | | ${email}@${req.socket.remoteAddress}\n`);
     res.status(200).json(employer[0]);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1807,11 +1819,10 @@ app.get("/employer", async (req, res) => {
 
 //save job to database
 app.post("/save-job", async (req, res) => {
-  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const email = req.user.email;
   const { job_id } = req.body;
-  writer.write(`${setTimestamp(newTime)} | | source: /save-job | info: save job attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /save-job | info: save job attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   try {
     if (!seeker_id || !job_id) {
       throw {
@@ -1836,27 +1847,26 @@ app.post("/save-job", async (req, res) => {
         job_id: job_id,
       }
     );
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /save-job | success: job saved | | ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /save-job | success: job saved | | ${email}@${req.socket.remoteAddress}\n`);
     res.status(200).json({ message: "Job saved successfully" });
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /employer | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /employer | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 //fetch saved jobs from database
 app.get("/saved-jobs", async (req, res) => {
-  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const email = req.user.email;
-  writer.write(`${setTimestamp(newTime)} | | source: /saved-jobs | info: get saved jobs attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /saved-jobs | info: get saved jobs attempt | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   
   if (!req.user.user_id) {
     return res.status(400).json({ error: "Missing seeker_id" });
@@ -1888,27 +1898,26 @@ app.get("/saved-jobs", async (req, res) => {
         seeker_id: seeker_id,
       }
     );
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /saved-jobs | success: saved jobs returned | | ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /saved-jobs | success: saved jobs returned | | ${email}@${req.socket.remoteAddress}\n`);
     res.status(200).json(rows);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /saved-jobs | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
 
 //remove job
 app.delete("/saved-jobs/:jobId", async (req, res) => {
-  const newTime = new Date(Date.now());// for logging
   const seeker_id = req.user.user_id;
   const jobId = req.params.jobId;
-  writer.write(`${setTimestamp(newTime)} | | source: /saved-jobs/${jobId} | info: delete saved job attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /saved-jobs/${jobId} | info: delete saved job attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
   
   try {
     if (!seeker_id || !jobId) {
@@ -1925,17 +1934,17 @@ app.delete("/saved-jobs/:jobId", async (req, res) => {
     if (result.affectedRows === 0) {
       throw({status: 404, error: 'failed to delete saved job', reason: 'job not found'});
     }
-    writer.write(`${setTimestamp(newTime)} | status: 200 | source: /saved-jobs/${jobId} | success: deleted saved job | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | status: 200 | source: /saved-jobs/${jobId} | success: deleted saved job | | ${req.user.email}@${req.socket.remoteAddress}\n`);
     res.status(200).json({ message: "Job removed successfully" });
   } catch (err) {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime)} | status: 500 | source: /saved-jobs/${jobId} | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /saved-jobs/${jobId} | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime)} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs/${jobId} | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /saved-jobs/${jobId} | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1946,12 +1955,11 @@ app.post('upload-pfp', multer({dest: '../images', fileFilter: fileFilter}).singl
 
 //add a logout endpoint
 app.post("/logout", (req, res) => {
-  const newTime = new Date(Date.now()); // for logging
-  writer.write(`${setTimestamp(newTime)} | | source: /logout | info: logout attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | | source: /logout | info: logout attempt | | ${req.user.email}@${req.socket.remoteAddress}\n`);
   
   // Clear client-side data instructions.
   res.status(200).json({ success: true, message: "Logout successful. Please clear your token from the client." });
-  writer.write(`${setTimestamp(newTime)} | status: 200 | source: /logout | success: user logged out | | ${req.user.email}@${req.socket.remoteAddress}\n`);
+  writer.write(`${setTimestamp(newTime())} | status: 200 | source: /logout | success: user logged out | | ${req.user.email}@${req.socket.remoteAddress}\n`);
 });
 
 app.listen(port, () => {
