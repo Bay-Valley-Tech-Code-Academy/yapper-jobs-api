@@ -1403,7 +1403,7 @@ app.get('/job/applications', async (req, res) => {
     }
     try {
       const [apps] = await req.db.query(`
-        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, app_index, title, first_name, last_name, seen, accepted, rejected
+        SELECT HEX(Seeker.seeker_id) AS user_id, email, Job.job_id, app_index, title, first_name, last_name, seen, accepted, rejected, date_applied
         FROM Application INNER JOIN (Seeker, Job)
         ON (Seeker.seeker_id = Application.seeker_id AND Job.job_id = Application.job_id)
         WHERE (Job.company = :company AND Seeker.delete_flag = 0 AND Job.delete_flag = 0 AND app_index > :start_index)
@@ -1417,7 +1417,7 @@ app.get('/job/applications', async (req, res) => {
       console.log(apps)
       const response = {success: true};
       response.apps = apps;
-      //writer.write(`${setTimestamp(newTime())} | status: 200 | source: /resume | success: get attempt: resume | | @${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/applications | success: get attempt: applications | | @${req.socket.remoteAddress}\n`);
       res.status(200).json(response)
     } catch (err) {
       console.error(err);
