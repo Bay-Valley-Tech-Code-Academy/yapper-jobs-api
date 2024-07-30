@@ -7,7 +7,7 @@ const bodyParser = require('body-parser');
 const multer = require('multer');
 const fs = require('fs');
 const { rateLimit } = require('express-rate-limit');
-const {checkUser, checkAuth, login, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates, fileFilter} = require('./helper.js');
+const {checkUser, checkAuth, login, newTime, setTimestamp, validSAN, validSA, validA, validN, validState, validJSON, validExpDate, validDate, validDates, fileFilter} = require('./helper.js');
 const { title } = require('process');
 const { error } = require('console');
 const { sendEmail, sendApplication, sendDelete } = require('./Email.js');
@@ -387,6 +387,7 @@ app.get('/job/search/get', async (req, res) => {
   const industry = !req.query.ind ? null : req.query.ind;
   const experience_level = !req.query.exp ? null : req.query.exp;
   const employment_type = !req.query.emp ? null : req.query.emp;
+  const company = !req.query.comp ? null : req.query.comp;
   const company_size = !req.query.size ? null : req.query.size;
   const salary_range = !req.query.sal ? null : req.query.sal;
   const benefits = !req.query.ben ? null : req.query.ben;
@@ -396,7 +397,7 @@ app.get('/job/search/get', async (req, res) => {
     const start_index = parseInt(req.query.startIndex);
     const per_page = parseInt(req.query.perPage);
     const args = {start_index: start_index, per_page: per_page};
-    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type FROM Job WHERE (delete_flag = 0 AND job_id >= :start_index';
+    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type, date_created FROM Job WHERE (delete_flag = 0 AND job_id >= :start_index';
     if(remote === true) {
       search_query += ' AND remote = 1';
     } else if(location !== null) {
@@ -428,6 +429,13 @@ app.get('/job/search/get', async (req, res) => {
       }
       search_query += ' AND employment_type = :employment_type';
       args.employment_type = employment_type;
+    }
+    if(company !== null) {
+      if(!validSAN(company)) {
+        throw({status: 400, error: 'failed get attempt: jobs', reason: 'invalid company name'});
+      }
+      search_query += ' AND company = :company';
+      args.company = company;
     }
     if(company_size !== null) {
       if(!validSAN(company_size)) {
@@ -1690,6 +1698,48 @@ app.delete('/job/delete', async (req, res) => {
   }
 });
 
+// fetch user
+app.get("/user", async (req, res) => {
+  const email = req.user.email;
+  const table = req.user.type;
+  const id = req.user.user_id
+  writer.write(`${setTimestamp(newTime())} | | source: /user | info: get user info | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  try {
+    let user;
+    if(table == 'seeker') {
+      const [[rep]] = await req.db.query(`
+        SELECT first_name, last_name, email, "seeker" AS type
+        FROM Seeker
+        WHERE seeker_id = UNHEX(:id);
+      `,{
+        id: id,
+      });
+      user = rep;
+    } else {
+      const [[rep]] = await req.db.query(`
+        SELECT first_name, last_name, email, company, "employer" AS type
+        FROM Employer
+        WHERE employer_id = UNHEX(:id);
+      `, {
+        id: id,
+      });
+      user = rep;
+    }
+    res.status(200).json(user);
+    writer.write(`${setTimestamp(newTime())} | | source: /user | success: got user info | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+  } catch (err) {
+    console.error(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /user | error: ${err.message} | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /user | error: ${err.error} | reason: ${err.reason} | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
 // fetch user profile
 app.get("/profile", async (req, res) => {
   const email = req.user.email;
@@ -1707,8 +1757,8 @@ app.get("/profile", async (req, res) => {
         id: id,
       });
     } else {
-      [[user]] = req.db.query(`
-        SELECT industry, company, company_size, website, mobile
+      [[user]] = await req.db.query(`
+        SELECT industry, website, mobile
         FROM Employer
         WHERE employer_id = UNHEX(:id);
       `, {
@@ -1716,7 +1766,7 @@ app.get("/profile", async (req, res) => {
       });
     }
     res.status(200).json(user);
-    writer.write(`${setTimestamp(newTime())} | | source: /profile | info: get user profile | | attempt: ${email}@${req.socket.remoteAddress}\n`);
+    writer.write(`${setTimestamp(newTime())} | | source: /profile | success: got user profile | | attempt: ${email}@${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
     if(!err.reason) {
