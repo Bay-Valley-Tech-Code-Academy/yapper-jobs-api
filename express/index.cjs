@@ -397,7 +397,8 @@ app.get('/job/search/get', async (req, res) => {
     const start_index = parseInt(req.query.startIndex);
     const per_page = parseInt(req.query.perPage);
     const args = {start_index: start_index, per_page: per_page};
-    let search_query = 'SELECT job_id, company, city, state, is_remote, salary_low, salary_high, employment_type, date_created FROM Job WHERE (delete_flag = 0 AND job_id >= :start_index';
+    let search_query = 'SELECT title, job_description, job_id, company, city, state, is_remote, salary_low, salary_high, employment_type, date_created FROM Job WHERE (delete_flag = 0 AND job_id > :start_index';
+    let search_query2 = 'SELECT COUNT(*) as count FROM (';
     if(remote === true) {
       search_query += ' AND remote = 1';
     } else if(location !== null) {
@@ -531,9 +532,13 @@ app.get('/job/search/get', async (req, res) => {
       search_query += ' AND MATCH (title, job_description, company, industry, experience_level, employment_type) AGAINST (:keyword IN BOOLEAN MODE)';
       args.keywords = querystr;
     }
+    search_query2 += search_query + ') LIMIT 1000) AS Jobs;';
     search_query += ') LIMIT :per_page;';
+
     const [jobs] = await req.db.query(search_query, args);
-    res.status(200).json({success: true, jobs: jobs});
+    const [[{count}]] = await req.db.query(search_query2, args);
+    bob(count)
+    res.status(200).json({success: true, jobs: jobs, count: count});
     writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
   } catch (err) {
     console.error(err);
@@ -544,6 +549,25 @@ app.get('/job/search/get', async (req, res) => {
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
       writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/search/get | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
+    }
+  }
+});
+
+// get total jobs count
+app.get('/jobs/count', async (req, res) => {
+  writer.write(`${setTimestamp(newTime())} | | source: /jobs/count | info: get job count | | @${req.socket.remoteAddress}\n`);
+  try {
+    const count = await req.db.query(`SELECT COUNT(*) FROM Job;`);
+    res.status(200).json(count);
+  } catch (err) {
+    console.error(err);
+    if(!err.reason) {
+      res.status(500).json({success: false, error: 'server failure'});
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /jobs/count | error: ${err.message} | | attempt: @${req.socket.remoteAddress}\n`);
+    }
+    else {
+      res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /jobs/count | error: ${err.error} | reason: ${err.reason} | attempt: @${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -579,8 +603,8 @@ app.get('/job/:job_id/get', async (req, res) => {
         throw({status: 500, error: 'failed job get', reason: 'search defaulted'});
     }
     const [[job]] = await req.db.query(`
-      SELECT title, company, city, state, remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
-      FROM Job,
+      SELECT title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, date_created, expires, date_expires
+      FROM Job
       WHERE job_id = :job_id;
     `,{
       job_id: job_id,
@@ -601,7 +625,7 @@ app.get('/job/:job_id/get', async (req, res) => {
 })
 
 //fetch jobs table from database
-app.get("/api/jobs", async (req, res) => {
+/* app.get("/api/jobs", async (req, res) => {
   try {
     const [jobs] = await req.db.query("SELECT * FROM job");
     res.status(200).json({ success: true, data: jobs });
@@ -609,7 +633,7 @@ app.get("/api/jobs", async (req, res) => {
     console.error('Error fetching jobs:', err);
     res.status(500).json({ success: false, error: 'Failed to fetch jobs' });
   }
-});
+}); */
 
 // forget password, should send email to link
 app.post('/forgot-password', async (req, res) => {
@@ -1320,11 +1344,11 @@ app.post('/job/apply/:job_id/submit', async (req, res) => {
     console.error(err);
     if(!err.reason) {
       res.status(500).json({success: false, error: 'server failure'});
-      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /resume | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: 500 | source: /job/apply | error: ${err.message} | | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
     else {
       res.status(!err.status ? 500 : err.status).json({success: false, error: err.reason});
-      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /resume | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
+      writer.write(`${setTimestamp(newTime())} | status: ${!err.status ? 500 : err.status} | source: /job/apply | error: ${err.error} | reason: ${err.reason} | attempt: ${req.user.email}@${req.socket.remoteAddress}\n`);
     }
   }
 });
@@ -1758,7 +1782,7 @@ app.get("/profile", async (req, res) => {
       });
     } else {
       [[user]] = await req.db.query(`
-        SELECT industry, website, mobile
+        SELECT industry, website, mobile, city, state
         FROM Employer
         WHERE employer_id = UNHEX(:id);
       `, {

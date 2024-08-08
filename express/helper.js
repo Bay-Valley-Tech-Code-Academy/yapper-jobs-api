@@ -229,7 +229,7 @@ module.exports = {
 
   // Human readable timestamp for log
   setTimestamp: function (timeUpdate) {
-    const months = (timeUpdate.getMonth() < 10) ? '0' + timeUpdate.getMonth() : timeUpdate.getMonth();
+    const months = ((timeUpdate.getMonth()+1) < 10) ? '0' + (timeUpdate.getMonth()+1) : (timeUpdate.getMonth()+1);
     const days = (timeUpdate.getDate() < 10) ? '0' + timeUpdate.getDate() : timeUpdate.getDate();
     const hours = (timeUpdate.getHours() < 10) ? '0' + timeUpdate.getHours() : timeUpdate.getHours();
     const minutes = (timeUpdate.getMinutes() < 10) ? '0' + timeUpdate.getMinutes() : timeUpdate.getMinutes();
