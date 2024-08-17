@@ -116,6 +116,70 @@ app.use('/register', registerLimiter);
 app.use('/resume', resumeLimiter);
 app.use('/job/apply', applyLimiter);
 
+// simplistic, dirty way to fill job table for testing
+app.get('/populate', async (req, res) => {
+  //const bob = Math.random() * max;
+  const title = ['Front-End Developer', 'Back-End Developer', 'QA Engineer', 'Debugger', 'Programmer'];
+  const company = ['MBI', 'Wis', 'Banana', 'Nikola', 'SVT', 'Macroshift'];
+  const city = ['San Jose', 'Modesto', 'Cupertino', 'Palo Alto', 'Sacramento'];
+  const state = 'CA';
+  //const is_remote = [0, 1];
+  const website = ['www.mbi.com', 'www.wis.com', 'www.banana.com', 'www.nikola.com', 'www.svt.org', 'www.macroshift.com'];
+  const experience_level = ['Entry', 'Junior', 'Mid Level', 'Senior'];
+  const employment_type = ['Internship', 'Part-Time', 'Full-Time', 'Contract', 'Per Diem'];
+  const company_size = ['Startup', 'Small Business', 'Small Corporation', 'Medium Corporation', 'Large Corporation'];
+  const salary_low = ['30000', '26520', '32500'];
+  const salary_high = ['64000', '120000', '55850', '89075', '110000'];
+  const benefits = ['Medical', 'Dental', '401k'];
+  const certifications = ['CompTIA Security+', 'CCNP', 'Cisco CyberOps', 'Cisco DevNet'];
+  const job_description = ['JavaScript', 'MySQL', 'React', 'HTML', 'Python', 'CSS', 'Bootstrap'];
+  const questions = null;
+  const id = '15211D0B1D4411EFBC9600155D6BEAC7';
+  for(let i = 0; i < 1000000; i++) {
+    //console.log(Math.floor(Math.random() * 5));
+    const co = Math.floor(Math.random() * 6);
+    const tit = title[Math.floor(Math.random() * 5)];
+    const com = company[co];
+    const cit = city[Math.floor(Math.random() * 5)];
+    const rem = Math.round(Math.random());
+    const web = website[co];
+    const exp = experience_level[Math.floor(Math.random() * 4)];
+    const emp = employment_type[Math.floor(Math.random() * 5)];
+    const siz = company_size[Math.floor(Math.random() * 5)];
+    const low = salary_low[Math.floor(Math.random() * 3)];
+    const hig = salary_high[Math.floor(Math.random() * 5)];
+    const cer = [];
+    cer.push(certifications[Math.floor(Math.random() * 4)]);
+    const job = job_description[Math.floor(Math.random() * 7)];
+    await req.db.query(`
+      INSERT INTO Job (title, company, city, state, is_remote, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, date_created, expires, date_expires)
+      VALUES (:title, :company, :city, :state, :is_remote, :industry, :website, :experience_level, :employment_type, :company_size, :salary_low, :salary_high, :benefits, :certifications, :job_description, :questions, UNHEX(:employer_id), DATE_FORMAT(:date_created,'%Y-%m-%d %H:%i:%s'), :expires, DATE_FORMAT(:date_expires,'%Y-%m-%d %H:%i:%s'));
+    `, {
+      title: tit,
+      company: com,
+      city: cit,
+      state: state,
+      is_remote: rem,
+      industry: 'Technology',
+      website: web,
+      experience_level: exp,
+      employment_type: emp,
+      company_size: siz,
+      salary_low: low,
+      salary_high: hig,
+      benefits: !benefits ? null : JSON.stringify(benefits),
+      certifications: JSON.stringify(cer),
+      job_description: job,
+      questions: questions,
+      employer_id: id,
+      date_created: newTime(),
+      expires: false,
+      date_expires: null,
+    });
+  }
+  res.status(200).json({success: true});
+});
+
 // Register endpoint for job seeker
 app.post('/register/seeker', async (req, res) => {
   console.log('registration attempt: seeker');
@@ -527,17 +591,15 @@ app.get('/job/search/get', async (req, res) => {
         if(!validSAN(keywords) && keywords === undefined) {
           throw({status: 400, error: 'failed get attempt: jobs', reason: 'malformed query'});
         }
-        querystr = keywords;
+        querystr = keywords + '*';
       }
-      search_query += ' AND MATCH (title, job_description, company, industry, experience_level, employment_type) AGAINST (:keyword IN BOOLEAN MODE)';
+      search_query += ' AND MATCH (title, job_description, company, industry, experience_level, employment_type) AGAINST (:keywords IN BOOLEAN MODE)';
       args.keywords = querystr;
     }
     search_query2 += search_query + ') LIMIT 1000) AS Jobs;';
     search_query += ') LIMIT :per_page;';
-
     const [jobs] = await req.db.query(search_query, args);
     const [[{count}]] = await req.db.query(search_query2, args);
-    bob(count)
     res.status(200).json({success: true, jobs: jobs, count: count});
     writer.write(`${setTimestamp(newTime())} | status: 200 | source: /job/search/get | success: search successful | | @${req.socket.remoteAddress}\n`);
   } catch (err) {

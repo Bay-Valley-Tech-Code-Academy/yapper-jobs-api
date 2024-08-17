@@ -36,12 +36,13 @@ CREATE TABLE Job (
 	job_description TEXT NOT NULL,
 	questions JSON,
 	delete_flag BOOLEAN NOT NULL DEFAULT 0,
-	date_created DATETIME DEFAULT ,
+	date_created DATETIME DEFAULT CURRENT_TIMESTAMP,
 	expires BOOLEAN,
     date_expires DATETIME,
 	employer_id BINARY(16),
 	PRIMARY KEY (job_id),
-	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id)
+	FOREIGN KEY (employer_id) REFERENCES Employer(employer_id),
+    FULLTEXT KEY job_search (title, job_description, company, industry, experience_level, employment_type)
 );
 
 CREATE TABLE Seeker (
@@ -137,8 +138,8 @@ VALUE(UNHEX('00000000000000000000000000000001'), "example", "example", "elpmaxe"
 INSERT INTO Employer(employer_id, first_name, last_name, user_pass, email, mobile, company, website, industry)
 VALUE(UNHEX('00000000000000000000000000000000'), "example", "example", "elpmaxe", "elpmxe@example.com", "12095550123", "example", "example.com", "example");
 
-INSERT INTO Job (title, company, city, state, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id)
-VALUE('example', 'example', 'example', 'EX', 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'));
+INSERT INTO Job (title, company, city, state, industry, website, experience_level, employment_type, company_size, salary_low, salary_high, benefits, certifications, job_description, questions, employer_id, delete_flag)
+VALUE('example', 'example', 'example', 'EX', 'example', 'example', 'example', 'example', 0, 0, 0, NULL, NULL, 'bob', NULL, UNHEX('00000000000000000000000000000000'), 1);
 
 INSERT INTO Application (seeker_id, job_id, answers)
 VALUE(UNHEX('00000000000000000000000000000001'), 1, null);
